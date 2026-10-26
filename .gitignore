@@ -1,0 +1,28 @@
+# Python and local environments
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.DS_Store
+
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Local data and generated artifacts
+/data/
+/models/*
+!/models/.gitkeep
+/mlruns/
+/mlartifacts/
+/logs/
+/reports/generated/
+
+# DVC local cache and credentials, if enabled later
+/.dvc/cache/
+/.dvc/tmp/
+/.dvc/config.local
