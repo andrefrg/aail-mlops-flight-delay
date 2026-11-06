@@ -1,5 +1,3 @@
-"""Mover um alias MLflow, seguindo o script de promoção do tutorial do docente."""
-
 import argparse
 import os
 
