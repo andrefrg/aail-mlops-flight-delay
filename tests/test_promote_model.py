@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock
 
-from scripts.promote_model import promote_model
+from model_promotion.promote_model import promote_model
 
 
 class PromoteModelTest(unittest.TestCase):

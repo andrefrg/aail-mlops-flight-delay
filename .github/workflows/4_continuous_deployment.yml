@@ -61,7 +61,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: '3.10'
 
       - run: python -m pip install uv==0.9.5
       - run: uv sync --frozen
@@ -83,7 +83,7 @@ jobs:
         env:
           FROM_ALIAS: production
           TO_ALIAS: production
-        run: uv run --frozen python scripts/promote_model.py --check-only
+        run: uv run --frozen python model_promotion/promote_model.py --check-only
 
       - name: Parar e remover o serviço anterior
         run: |
