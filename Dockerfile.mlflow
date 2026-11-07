@@ -1,0 +1,13 @@
+FROM python:3.14-slim
+
+RUN pip install --no-cache-dir "mlflow[auth]==3.18.0" \
+    && groupadd --system mlflow \
+    && useradd --system --gid mlflow --home-dir /mlflow mlflow \
+    && mkdir -p /mlflow \
+    && chown mlflow:mlflow /mlflow
+
+WORKDIR /mlflow
+USER mlflow
+EXPOSE 5050
+
+CMD ["mlflow", "server", "--host", "0.0.0.0", "--port", "5050", "--backend-store-uri", "sqlite:////mlflow/mlflow.db", "--default-artifact-root", "/mlflow/artifacts"]
