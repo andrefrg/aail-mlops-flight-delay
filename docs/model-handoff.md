@@ -36,10 +36,10 @@ e é exposto pelo serviço flask_app do Compose.
 
 ## Limites de responsabilidade
 
-O Compose configura um servidor MLflow local e a API; registry, autenticação, VMs,
-CI/CD e deployment continuam fora do âmbito. Os dados e modelos gerados ficam
-fora do Git. O baseline é inicial e prevê quase sempre on_time; os resultados não
-demonstram utilidade operacional.
+O Compose configura a API; registry, autenticação, VMs, CI/CD e deployment
+continuam fora do âmbito. Os dados e modelos gerados ficam fora do Git. O
+baseline é inicial e prevê quase sempre on_time; os resultados não demonstram
+utilidade operacional.
 
 Comandos locais:
 
@@ -66,5 +66,5 @@ Os três mounts de saída preservam os Parquet, o modelo e as métricas após a
 remoção do container. --retrain pode ser acrescentado para repetir o ajuste.
 O relatório em Markdown também fica em reports/generated/baseline/summary.md.
 Este container só prepara, treina e avalia: não expõe portas nem arranca serviços.
-Para executar treino, API e MLflow com Compose, consulte a secção Docker Compose
-do README. O serviço de treino é opcional e utiliza o perfil `training`.
+Para executar treino e API com Compose, consulte a secção Docker Compose do
+README. O serviço de treino é opcional e utiliza o perfil `training`.

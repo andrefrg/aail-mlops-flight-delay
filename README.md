@@ -32,15 +32,15 @@ requirements.txt e o pacote deste repositório.
 - `docs/baseline-results.md`: métricas e limitações reais.
 
 Os CSV originais ficam fora do Git em ../dataset/. DVC continua adiado.
-O repositório inclui Dockerfiles para treino, serviço da API e servidor MLflow;
-CI/CD, provisionamento e autenticação continuam fora do âmbito.
+O repositório inclui Dockerfiles para treino e serviço da API; CI/CD,
+provisionamento e autenticação continuam fora do âmbito.
 
 ## Docker Compose
 
-O Compose arranca um servidor MLflow em `http://localhost:5050` e a API em
-`http://localhost:8081`. A API carrega `models/model.joblib` do diretório local
-`models/`; treine o modelo antes de a API ser considerada saudável. Para usar um
-diretório de dados diferente do `../dataset` predefinido, defina `DATASET_DIR`.
+O Compose arranca a API em `http://localhost:8081`. A API carrega
+`models/model.joblib` do diretório local `models/`; treine o modelo antes de a API
+ser considerada saudável. Para usar um diretório de dados diferente do
+`../dataset` predefinido, defina `DATASET_DIR`.
 
 ```powershell
 $env:DATASET_DIR = (Resolve-Path ..\dataset).Path
@@ -48,5 +48,4 @@ docker compose --profile training run --build --rm train
 docker compose up --build
 ```
 
-O serviço `train` só é iniciado explicitamente com o perfil `training`, e os
-dados de MLflow persistem no volume Docker `mlflow-data`.
+O serviço `train` só é iniciado explicitamente com o perfil `training`.

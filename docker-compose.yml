@@ -1,12 +1,4 @@
 services:
-  mlflow:
-    build:
-      context: .
-      dockerfile: Dockerfile.mlflow
-    ports:
-      - "${MLFLOW_PORT:-5050}:5050"
-    volumes:
-      - mlflow-data:/mlflow
   flask_app:
     build:
       context: .
@@ -33,6 +25,3 @@ services:
       - ./data:/app/data
       - ./models:/app/models
       - ./reports:/app/reports
-
-volumes:
-  mlflow-data:
