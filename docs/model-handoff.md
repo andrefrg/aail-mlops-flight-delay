@@ -55,7 +55,7 @@ quase sempre on_time; os resultados não demonstram utilidade operacional.
 docker build -f Dockerfile.train -t aail-train .
 mkdir -p data models reports
 docker run --rm \
-  -v "$(cd ../dataset && pwd):/data:ro" \
+  -v "$(cd ./dataset && pwd):/data:ro" \
   -v "$PWD/data:/app/data" \
   -v "$PWD/models:/app/models" \
   -v "$PWD/reports:/app/reports" \

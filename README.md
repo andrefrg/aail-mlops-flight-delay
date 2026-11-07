@@ -34,6 +34,9 @@ requirements.txt e o pacote deste repositório.
 Os CSV originais ficam fora do Git em ../dataset/. DVC continua adiado.
 O repositório inclui Dockerfiles para treino e serviço da API; CI/CD,
 provisionamento e autenticação continuam fora do âmbito.
+Não se implementam nesta contribuição API HTTP, Docker de serviço, CI/CD, provisionamento,
+registry, autenticação ou registo no MLflow. São trabalho dos restantes colegas.
+Os CSV originais ficam fora do Git em ./dataset/. DVC continua adiado.
 
 ## Docker Compose
 

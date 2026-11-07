@@ -343,7 +343,7 @@ def run_audit(data_dir: Path, output_dir: Path, policy_path: Path, chunksize: in
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data-dir", type=Path, default=PROJECT_ROOT.parent / "dataset")
+    parser.add_argument("--data-dir", type=Path, default=PROJECT_ROOT / "dataset")
     parser.add_argument("--output-dir", type=Path, help="Default: reports/generated/data_audit (or data_audit_smoke for a partial run).")
     parser.add_argument("--policy", type=Path, default=PROJECT_ROOT / "configs/feature_policy.csv")
     parser.add_argument("--chunksize", type=int, default=100_000)

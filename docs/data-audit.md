@@ -27,8 +27,8 @@ usadas em cada auditoria ficam em summary.json.
 
 ## Inputs e outputs
 
-Por omissão, os inputs são `../dataset/flights_2022.csv` e
-`../dataset/flights_2023.csv`, relativos ao repositório, independentemente da
+Por omissão, os inputs são `./dataset/flights_2022.csv` e
+`./dataset/flights_2023.csv`, relativos ao repositório, independentemente da
 pasta corrente no terminal. Para outro local:
 
 ```bash
