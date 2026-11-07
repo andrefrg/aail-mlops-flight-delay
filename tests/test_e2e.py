@@ -7,7 +7,7 @@ from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 
-FLIGHTS_FILE = Path(__file__).parent / "fixtures" / "classify-request.json"
+FLIGHTS_FILE = Path(__file__).resolve().parents[1] / "examples" / "classify_request.json"
 VALID_CLASSES = ("on_time", "moderate_delay", "severe_delay")
 
 
