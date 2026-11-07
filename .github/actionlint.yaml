@@ -1,0 +1,4 @@
+self-hosted-runner:
+  labels:
+    - dei-training
+    - dei-deployment

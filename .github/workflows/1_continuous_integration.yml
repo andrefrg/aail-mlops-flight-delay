@@ -1,0 +1,126 @@
+# Estrutura do tutorial do docente: testes -> build -> publicação.
+name: 1 - Continuous Integration
+run-name: "${{ github.workflow }}"
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ${{ vars.REGISTRY }}
+
+jobs:
+  test-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Instalar uv
+        run: python -m pip install uv==0.9.5
+
+      - name: Instalar as versões guardadas no lockfile
+        run: uv sync --frozen
+
+      # TODO: ativar quando tests/test_api.py existir.
+#       - name: Testar a API
+#         run: uv run --frozen python -m pytest tests/test_api.py -v
+
+      # TODO: ativar quando tests/test_train.py existir.
+#       - name: Testar o treino
+#         run: uv run --frozen python -m pytest tests/test_train.py -v
+
+      - name: Testar a promoção de modelos
+        run: uv run --frozen python -m pytest tests/test_promote_model.py -v
+
+
+  # TODO: ativar quando os Dockerfiles de treino e API estiverem integrados.
+#   build-images:
+#     runs-on: ubuntu-latest
+#     needs: test-unit
+#     timeout-minutes: 30
+#     permissions:
+#       contents: read
+#       packages: write
+#     steps:
+#       - uses: actions/checkout@v4
+#         with:
+#           persist-credentials: false
+
+#       - name: Preparar o endereço das imagens
+#         shell: bash
+#         run: |
+#           test "$REGISTRY" = 'ghcr.io'
+#           echo "IMAGE_PREFIX=$REGISTRY/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+#       - uses: docker/setup-buildx-action@v3
+
+#       - name: Construir imagem de treino
+#         uses: docker/build-push-action@v5
+#         with:
+#           context: .
+#           file: ./deployment/Dockerfile.train
+#           platforms: linux/amd64
+#           push: false
+#           tags: training:${{ github.sha }}
+#           outputs: type=docker,dest=/tmp/training.tar
+
+#       - run: docker load --input /tmp/training.tar
+
+#       - name: Construir imagem da API
+#         uses: docker/build-push-action@v5
+#         with:
+#           context: .
+#           file: ./deployment/Dockerfile.api
+#           platforms: linux/amd64
+#           push: false
+#           tags: serving:${{ github.sha }}
+#           labels: org.opencontainers.image.revision=${{ github.sha }}
+#           outputs: type=docker,dest=/tmp/serving.tar
+
+#       - run: docker load --input /tmp/serving.tar
+
+#       - name: Autenticar no GHCR
+#         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+#         uses: docker/login-action@v3
+#         with:
+#           registry: ${{ env.REGISTRY }}
+#           username: ${{ github.actor }}
+#           password: ${{ secrets.GITHUB_TOKEN }}
+
+#       - name: Publicar imagem de treino
+#         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+#         run: |
+#           docker tag "training:$GITHUB_SHA" "$IMAGE_PREFIX/training:$GITHUB_SHA"
+#           docker push "$IMAGE_PREFIX/training:$GITHUB_SHA"
+
+#       - name: Publicar imagem da API
+#         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+#         run: |
+#           docker tag "serving:$GITHUB_SHA" "$IMAGE_PREFIX/serving:$GITHUB_SHA"
+#           docker push "$IMAGE_PREFIX/serving:$GITHUB_SHA"
+
+#       # As etapas seguintes recebem o SHA original, não o SHA implícito de workflow_run.
+#       - name: Guardar o commit que iniciou a cadeia
+#         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+#         run: echo "$GITHUB_SHA" > "$RUNNER_TEMP/source-commit.txt"
+
+#       - uses: actions/upload-artifact@v4
+#         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+#         with:
+#           name: source-commit
+#           path: ${{ runner.temp }}/source-commit.txt
+#           if-no-files-found: error
+#           retention-days: 14

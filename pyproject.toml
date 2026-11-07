@@ -1,0 +1,13 @@
+[project]
+name = "aail-mlops-flight-delay"
+version = "0.1.0"
+description = "Pipeline MLOps para classificação de atrasos de voos"
+requires-python = ">=3.10"
+dependencies = [
+    "mlflow[auth]>=3.18.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]
