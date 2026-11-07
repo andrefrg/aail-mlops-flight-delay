@@ -231,16 +231,16 @@ No PowerShell, antes de executar o treino:
 
 ```powershell
 $env:MLFLOW_TRACKING_URI = "http://10.17.0.253:8080"
-$env:MLFLOW_TRACKING_USERNAME = "username"
-$env:MLFLOW_TRACKING_PASSWORD = "passwordpassword"
+$env:MLFLOW_TRACKING_USERNAME = MLFLOW_USERNAME
+$env:MLFLOW_TRACKING_PASSWORD = MLFLOW_PASSWORD
 ```
 
 Em Linux:
 
 ```bash
 export MLFLOW_TRACKING_URI=http://10.17.0.253:8080
-export MLFLOW_TRACKING_USERNAME=username
-export MLFLOW_TRACKING_PASSWORD=passwordpassword
+export MLFLOW_TRACKING_USERNAME= MLFLOW_USERNAME
+export MLFLOW_TRACKING_PASSWORD= MLFLOW_PASSWORD
 ```
 
 O código Python pode continuar a usar `mlflow.set_tracking_uri("http://10.17.0.253:8080")`; o cliente lê as credenciais das variáveis de ambiente. Configura-as também em qualquer API que carregue modelos deste servidor.
