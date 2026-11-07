@@ -36,10 +36,10 @@ e é exposto pelo serviço flask_app do Compose.
 
 ## Limites de responsabilidade
 
-O Compose configura a API; registry, autenticação, VMs, CI/CD e deployment
-continuam fora do âmbito. Os dados e modelos gerados ficam fora do Git. O
-baseline é inicial e prevê quase sempre on_time; os resultados não demonstram
-utilidade operacional.
+O Compose configura a API. O CI já executa testes; a integração com o MLflow,
+o registry e as restantes etapas de CI/CD e deployment ainda estão em
+preparação. Os dados e modelos gerados ficam fora do Git. O baseline é inicial
+e prevê quase sempre on_time; os resultados não demonstram utilidade operacional.
 
 Comandos locais:
 
