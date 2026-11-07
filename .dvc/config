@@ -1,4 +1,0 @@
-[core]
-    remote = storage
-['remote "storage"']
-    url = ssh://admin@10.17.0.253/home/admin/dvc-storage/flight-delay
