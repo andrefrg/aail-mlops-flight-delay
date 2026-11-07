@@ -33,7 +33,7 @@ requirements.txt e o pacote deste repositório.
 
 Não se implementam nesta contribuição API HTTP, Docker de serviço, CI/CD, provisionamento,
 registry, autenticação ou registo no MLflow. São trabalho dos restantes colegas.
-Os CSV originais ficam fora do Git em ../dataset/. DVC continua adiado.
+Os CSV originais ficam fora do Git em ./dataset/. DVC continua adiado.
 
 A entrega inclui **Dockerfile.train**, apenas para preparação/treino/avaliação.
 Os comandos de build e execução estão em docs/model-handoff.md. A construção e

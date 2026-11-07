@@ -2,7 +2,7 @@
 
 ## Entradas e preparação
 
-Os CSV originais são ../dataset/flights_2022.csv e flights_2023.csv.
+Os CSV originais são ./dataset/flights_2022.csv e flights_2023.csv.
 Os dados derivados ficam em data/processed/, com pastas train (2022), validation
 (jan.–jun. 2023) e test (jul.–dez. 2023), subdivididas por mês.
 
