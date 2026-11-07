@@ -36,7 +36,7 @@ def wait_for_api(base_url, timeout=60):
 class FlightAPITest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.base_url = os.environ.get("API_BASE_URL", "http://127.0.0.1:8080").rstrip("/")
+        cls.base_url = os.environ.get("API_BASE_URL", "http://127.0.0.1:8081").rstrip("/")
         cls.flights = load_example_flights()
         wait_for_api(cls.base_url)
 

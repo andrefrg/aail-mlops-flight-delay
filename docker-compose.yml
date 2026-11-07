@@ -2,7 +2,7 @@ services:
   flask_app:
     build:
       context: .
-      dockerfile: Dockerfile.serve
+      dockerfile: deployment/Dockerfile.serve
     ports:
       - "${APP_PORT:-8081}:8000"
     environment:
@@ -13,7 +13,7 @@ services:
   train:
     build:
       context: .
-      dockerfile: Dockerfile.train
+      dockerfile: deployment/Dockerfile.train
     profiles:
       - training
     command: ["--data-dir", "/data"]

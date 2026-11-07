@@ -86,7 +86,7 @@ jobs:
 #         uses: docker/build-push-action@v5
 #         with:
 #           context: .
-#           file: ./deployment/Dockerfile.api
+#           file: ./deployment/Dockerfile.serve
 #           platforms: linux/amd64
 #           push: false
 #           tags: serving:${{ github.sha }}

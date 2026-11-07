@@ -52,7 +52,7 @@ quase sempre on_time; os resultados não demonstram utilidade operacional.
 ## Dockerfile de treino — entrega da parte 1
 
 ```bash
-docker build -f Dockerfile.train -t aail-train .
+docker build -f deployment/Dockerfile.train -t aail-train .
 mkdir -p data models reports
 docker run --rm \
   -v "$(cd ./dataset && pwd):/data:ro" \
