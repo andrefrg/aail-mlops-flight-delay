@@ -31,8 +31,11 @@ requirements.txt e o pacote deste repositório.
 - `docs/model-handoff.md`: entrega aos colegas.
 - `docs/baseline-results.md`: métricas e limitações reais.
 
-Não se implementam nesta contribuição API HTTP, Docker de serviço, CI/CD, provisionamento,
-registry, autenticação ou registo no MLflow. São trabalho dos restantes colegas.
+O `train.py` regista `estimator`, `C` e a accuracy do teste no MLflow, na experiência
+`voo-classification`, e publica o pipeline no Registry como `voos-model`.
+Configuração e comandos: [docs/README_mlflow.md](docs/README_mlflow.md).
+Para executar apenas localmente, usa `python train.py --no-tracking`.
+API HTTP, Docker de serviço e provisionamento continuam fora desta contribuição.
 Os CSV originais ficam fora do Git em ../dataset/. DVC continua adiado.
 
 A entrega inclui **Dockerfile.train**, apenas para preparação/treino/avaliação.
