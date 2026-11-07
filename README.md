@@ -31,11 +31,24 @@ requirements.txt e o pacote deste repositório.
 - `docs/model-handoff.md`: entrega aos colegas.
 - `docs/baseline-results.md`: métricas e limitações reais.
 
+Os CSV originais ficam fora do Git em ../dataset/. DVC continua adiado.
+O repositório inclui Dockerfiles para treino e serviço da API; CI/CD,
+provisionamento e autenticação continuam fora do âmbito.
 Não se implementam nesta contribuição API HTTP, Docker de serviço, CI/CD, provisionamento,
 registry, autenticação ou registo no MLflow. São trabalho dos restantes colegas.
 Os CSV originais ficam fora do Git em ./dataset/. DVC continua adiado.
 
-A entrega inclui **Dockerfile.train**, apenas para preparação/treino/avaliação.
-Os comandos de build e execução estão em docs/model-handoff.md. A construção e
-publicação da imagem no workflow pertencem ao colega 3; o Docker da API pertence
-ao colega 4. Não existe Compose nem Dockerfile de serviço nesta contribuição.
+## Docker Compose
+
+O Compose arranca a API em `http://localhost:8081`. A API carrega
+`models/model.joblib` do diretório local `models/`; treine o modelo antes de a API
+ser considerada saudável. Para usar um diretório de dados diferente do
+`../dataset` predefinido, defina `DATASET_DIR`.
+
+```powershell
+$env:DATASET_DIR = (Resolve-Path ..\dataset).Path
+docker compose --profile training run --build --rm train
+docker compose up --build
+```
+
+O serviço `train` só é iniciado explicitamente com o perfil `training`.
