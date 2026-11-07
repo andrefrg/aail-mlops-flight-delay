@@ -12,7 +12,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from app import create_app, load_model
+from scripts.app import create_app, load_model
 from flight_delay.data.audit import BASE_FEATURES
 from flight_delay.models.pipeline import make_pipeline
 
