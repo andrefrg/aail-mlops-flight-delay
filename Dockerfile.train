@@ -1,0 +1,11 @@
+FROM python:3.14-slim
+WORKDIR /app
+COPY requirements-baseline.txt ./
+RUN pip install --no-cache-dir -r requirements-baseline.txt
+COPY src ./src
+COPY scripts ./scripts
+COPY configs ./configs
+COPY train.py ./
+RUN mkdir -p data/processed models reports docs
+ENTRYPOINT ["python", "train.py"]
+CMD ["--data-dir", "/data"]

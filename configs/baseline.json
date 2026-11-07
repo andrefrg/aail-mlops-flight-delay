@@ -1,0 +1,59 @@
+{
+  "seed": 42,
+  "years": [
+    2022,
+    2023
+  ],
+  "chunksize": 100000,
+  "sample_per_month": 30000,
+  "gap_days": 7,
+  "features": [
+    "FlightDate",
+    "Reporting_Airline",
+    "Origin",
+    "Dest",
+    "CRSDepTime",
+    "CRSArrTime",
+    "CRSElapsedTime",
+    "Distance"
+  ],
+  "validation_start": "2023-01-01",
+  "holdout_start": "2023-07-01",
+  "end_exclusive": "2024-01-01",
+  "folds": [
+    {
+      "name": "2022_Q4",
+      "validation_start": "2022-10-01",
+      "validation_end": "2023-01-01"
+    },
+    {
+      "name": "2023_Q1",
+      "validation_start": "2023-01-01",
+      "validation_end": "2023-04-01"
+    },
+    {
+      "name": "2023_Q2",
+      "validation_start": "2023-04-01",
+      "validation_end": "2023-07-01"
+    }
+  ],
+  "variants": [
+    {
+      "name": "logistic_C0.1",
+      "C": 0.1
+    },
+    {
+      "name": "logistic_C1.0",
+      "C": 1.0
+    },
+    {
+      "name": "logistic_C10.0",
+      "C": 10.0
+    }
+  ],
+  "model": {
+    "estimator": "LogisticRegression",
+    "max_iter": 200
+  },
+  "selection_metric": "mean_validation_accuracy"
+}
