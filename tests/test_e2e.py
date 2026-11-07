@@ -7,7 +7,7 @@ from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 
-FLIGHTS_FILE = Path(__file__).parent / "fixtures" / "classify-request.json"
+FLIGHTS_FILE = Path(__file__).resolve().parents[1] / "examples" / "classify_request.json"
 VALID_CLASSES = ("on_time", "moderate_delay", "severe_delay")
 
 
@@ -36,7 +36,7 @@ def wait_for_api(base_url, timeout=60):
 class FlightAPITest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.base_url = os.environ.get("API_BASE_URL", "http://127.0.0.1:8080").rstrip("/")
+        cls.base_url = os.environ.get("API_BASE_URL", "http://127.0.0.1:8081").rstrip("/")
         cls.flights = load_example_flights()
         wait_for_api(cls.base_url)
 

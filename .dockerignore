@@ -6,6 +6,7 @@
 .env
 .env.*
 data
+dataset
 models
 mlflow
 mlruns

@@ -18,10 +18,9 @@ Comandos propostos para acordar com o grupo, a partir da raiz:
 .venv/bin/python scripts/predict.py --input examples/classify_request.json
 ```
 
-O modelo já treinado está em `models/model.joblib`. O treino reutiliza o artefacto
-verificado; `train.py --retrain` repete os ajustes e substitui resultados locais.
-Para outro ambiente, o colega responsável integra as bibliotecas declaradas em
-requirements.txt e o pacote deste repositório.
+O treino guarda o modelo em `models/model.joblib` e reutiliza o artefacto
+quando este corresponde ao contexto registado. `train.py --retrain` repete os
+ajustes e substitui resultados locais.
 
 - `configs/feature_policy.csv`: justificação dos 109 campos e oito inputs iniciais.
 - `configs/baseline.json`: preparação, amostra, datas dos folds e C.
@@ -38,7 +37,25 @@ Para executar apenas localmente, usa `python train.py --no-tracking`.
 API HTTP, Docker de serviço e provisionamento continuam fora desta contribuição.
 Os CSV originais ficam fora do Git em ../dataset/. DVC continua adiado.
 
-A entrega inclui **Dockerfile.train**, apenas para preparação/treino/avaliação.
-Os comandos de build e execução estão em docs/model-handoff.md. A construção e
-publicação da imagem no workflow pertencem ao colega 3; o Docker da API pertence
-ao colega 4. Não existe Compose nem Dockerfile de serviço nesta contribuição.
+Os CSV originais ficam fora do Git. Por defeito, o treino local lê os ficheiros
+de `./dataset/`, dentro do repositório. Para usar outra pasta, executa
+`python train.py --data-dir CAMINHO`.
+
+O repositório inclui uma API HTTP, Dockerfiles de treino e serviço, e um workflow
+de CI. A integração do treino e da API com o MLflow e as restantes etapas de
+CI/CD ainda estão em preparação. DVC continua adiado.
+
+## Docker Compose
+
+O Compose arranca a API em `http://localhost:8081`. A API carrega
+`models/model.joblib` do diretório local `models/`; treine o modelo antes de a API
+ser considerada saudável. O serviço de treino do Compose lê, por defeito,
+`../dataset/`, fora do repositório. Para usar outra pasta, define `DATASET_DIR`.
+
+```powershell
+$env:DATASET_DIR = (Resolve-Path ..\dataset).Path
+docker compose --profile training run --build --rm train
+docker compose up --build
+```
+
+O serviço `train` só é iniciado explicitamente com o perfil `training`.

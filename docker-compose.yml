@@ -1,0 +1,27 @@
+services:
+  flask_app:
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile.serve
+    ports:
+      - "${APP_PORT:-8081}:8000"
+    environment:
+      MODEL_PATH: /app/models/model.joblib
+      MODEL_VERSION: ${MODEL_VERSION:-unknown}
+    volumes:
+      - ./models:/app/models:ro
+  train:
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile.train
+    profiles:
+      - training
+    command: ["--data-dir", "/data"]
+    volumes:
+      - type: bind
+        source: ${DATASET_DIR:-../dataset}
+        target: /data
+        read_only: true
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./reports:/app/reports

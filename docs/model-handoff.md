@@ -31,17 +31,17 @@ FL_DATE. Confirmar os outros nomes BTS com o avaliador.
 
 O exemplo examples/classify_request.json demonstra os oito atributos brutos.
 O helper Python flight_delay.models.inference.classify_payload permite verificar
-localmente instances -> classifications. Não implementa um endpoint HTTP nem
-substitui o trabalho do colega 4.
+localmente instances -> classifications. O endpoint HTTP está em scripts/app.py
+e é exposto pelo serviço flask_app do Compose.
 
 ## Limites de responsabilidade
 
-Esta contribuição não configura servidor MLflow, registry, autenticação, VMs,
-Docker de serviço, CI/CD ou deployment. O colega 2 pode registar o ficheiro model e os
-parâmetros/métricas exportados no tracking da equipa. O colega 4 carrega esse
-pipeline no endpoint acordado. O colega 3 integra os comandos nos workflows.
+O Compose configura a API. O CI já executa testes; a integração com o MLflow,
+o registry e as restantes etapas de CI/CD e deployment ainda estão em
+preparação. Os dados e modelos gerados ficam fora do Git. O baseline é inicial
+e prevê quase sempre on_time; os resultados não demonstram utilidade operacional.
 
-Proposta de comandos para a equipa, ainda a acordar:
+Comandos locais:
 
 - Treino/preparação/avaliação: python train.py
 - Inferência local: python scripts/predict.py --input CAMINHO_JSON
@@ -52,10 +52,10 @@ quase sempre on_time; os resultados não demonstram utilidade operacional.
 ## Dockerfile de treino — entrega da parte 1
 
 ```bash
-docker build -f Dockerfile.train -t aail-train .
+docker build -f deployment/Dockerfile.train -t aail-train .
 mkdir -p data models reports
 docker run --rm \
-  -v "$(cd ../dataset && pwd):/data:ro" \
+  -v "$(cd ./dataset && pwd):/data:ro" \
   -v "$PWD/data:/app/data" \
   -v "$PWD/models:/app/models" \
   -v "$PWD/reports:/app/reports" \
@@ -66,4 +66,5 @@ Os três mounts de saída preservam os Parquet, o modelo e as métricas após a
 remoção do container. --retrain pode ser acrescentado para repetir o ajuste.
 O relatório em Markdown também fica em reports/generated/baseline/summary.md.
 Este container só prepara, treina e avalia: não expõe portas nem arranca serviços.
-O colega 3 decide como executar estes comandos no workflow da equipa.
+Para executar treino e API com Compose, consulte a secção Docker Compose do
+README. O serviço de treino é opcional e utiliza o perfil `training`.

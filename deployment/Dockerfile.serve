@@ -1,0 +1,19 @@
+FROM python:3.10
+WORKDIR /app
+RUN groupadd --system app && useradd --system --gid app --home-dir /app app \
+    && chown app:app /app
+COPY requirements-baseline.txt ./
+RUN pip install --no-cache-dir -r requirements-baseline.txt "Flask>=3.0,<4" "gunicorn>=23,<27"
+ARG MODEL_VERSION=unknown
+ENV MODEL_VERSION=${MODEL_VERSION}
+ENV MODEL_PATH=/app/models/model.joblib \
+    PORT=8000 \
+    PYTHONPATH=/app/src
+COPY --chown=app:app src ./src
+COPY --chown=app:app scripts ./scripts
+USER app
+HEALTHCHECK --interval=10s --timeout=3s --start-period=30s --retries=3 \
+    CMD python -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/health' % os.environ.get('PORT', '8000'), timeout=2)"
+
+EXPOSE 8000
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "scripts.app:app"]
