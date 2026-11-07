@@ -38,7 +38,7 @@ def main():
     parser.add_argument(
         "--phase", choices=["all", "prepare", "train", "evaluate", "register"], default="all"
     )
-    parser.add_argument("--data-dir", type=Path, default=ROOT.parent / "dataset")
+    parser.add_argument("--data-dir", type=Path, default=ROOT / "dataset")
     parser.add_argument("--config", type=Path, default=ROOT / "configs/baseline.json")
     parser.add_argument("--force-prepare", action="store_true")
     parser.add_argument(
