@@ -1,5 +1,49 @@
 # Servidor MLflow no Debian 12
 
+## Integração com o treino
+
+O `train.py` liga-se por omissão a `http://10.17.0.253:8080`, usa a experiência
+`voo-classification` e publica o pipeline completo no Model Registry como `voos-model`.
+O Registry usa o mesmo servidor do tracking.
+
+No PowerShell, a partir da raiz do repositório:
+
+```powershell
+python -m pip install -r requirements.txt
+# Preenche primeiro o utilizador e a palavra-passe no .env da raiz.
+python train.py --retrain
+```
+
+O `train.py` carrega automaticamente o `.env` da raiz do repositório, mesmo quando
+é executado a partir de outra pasta. As variáveis já definidas no ambiente têm
+prioridade sobre o ficheiro. Preenche `MLFLOW_TRACKING_USERNAME` e
+`MLFLOW_TRACKING_PASSWORD` com as credenciais da conta existente no servidor.
+O `.env` está excluído do Git. Em Docker, passa as variáveis com `--env-file .env`.
+
+Cada execução regista apenas os parâmetros `estimator` e `C` do modelo escolhido
+e a métrica `accuracy` do teste final. O modelo inclui o código de `flight_delay`
+necessário às suas transformações. Não se usa autologging.
+
+- `--phase prepare`: prepara dados sem contactar o MLflow.
+- `--phase train`: regista os parâmetros e o modelo, sem accuracy de teste.
+- `--phase evaluate`: regista os parâmetros, a accuracy e o modelo já existente.
+- `--phase register`: publica o modelo e a accuracy já guardados, sem preparar dados,
+  treinar ou avaliar novamente. Verifica os hashes do modelo, configuração e manifesto
+  e identifica na run o código do treino original. Útil para repetir uma publicação
+  que falhou depois de o treino terminar.
+- Sem `--phase`: executa preparação, treino e avaliação numa única run.
+- `--no-tracking`: mantém a execução local, sem ligação ao servidor.
+
+O comportamento de reutilização mantém-se: se o modelo e a avaliação existentes
+forem válidos, são reutilizados e publicados numa nova run/versão, sem novo ajuste.
+Usa `--retrain` para treinar novamente. Como o projeto verifica um hash do código,
+esta alteração exige um novo treino se existirem artefactos de uma versão anterior.
+Uma falha de ligação ou autenticação é propagada; não se apresenta o registo como concluído.
+Não se alteram automaticamente os aliases `staging` ou `production`.
+
+O pipeline é publicado em formato `skops`, autorizando explicitamente apenas os tipos
+adicionais `flight_delay.features.build.FlightFeatures` e `numpy.dtype`.
+
 Esta pasta contém scripts para iniciar e terminar o servidor MLflow numa VM Debian 12. O servidor disponibiliza a interface web e a API para registar experiências, parâmetros, métricas e artefactos enviados pelas máquinas de treino.
 
 ## Configuração atual
@@ -179,6 +223,9 @@ Edita as opções em `start_mlflow.sh` com o servidor parado:
 
 - `--port`: porta de acesso ao servidor. Se a alterares, atualiza também a verificação `ss`, os valores de `--allowed-hosts` e a mensagem com o URL no script.
 - `--allowed-hosts`: nomes e endereços aceites no cabeçalho HTTP `Host`. Atualiza esta lista se mudares o IP ou passares a usar DNS. Esta opção não é uma lista de IPs de clientes autorizados.
+- `--cors-allowed-origins`: origens aceites nos pedidos do browser. O script autoriza
+  `http://10.17.0.253:8080`. Atualiza também este valor se mudares o endereço, porta
+  ou protocolo de acesso à interface.
 - `--workers`: quantidade de processos que atendem pedidos. Um worker reduz o consumo de RAM; mais workers podem ajudar com pedidos simultâneos, mas aumentam o consumo de recursos.
 - `--backend-store-uri`: localização da base de dados. O caminho SQLite atual é relativo à pasta dos scripts.
 - `--artifacts-destination`: destino dos artefactos servidos pelo MLflow. Alterar esta opção não migra automaticamente os artefactos existentes.
@@ -290,6 +337,12 @@ sed -i 's/\r$//' start_mlflow.sh stop_mlflow.sh
 ### O browser não consegue aceder
 
 Verifica primeiro os logs e a porta na VM. Se o acesso local funcionar, confirma o IP, a ligação de rede ou VPN e as regras de firewall. Uma resposta de rejeição do cabeçalho `Host` exige verificar `--allowed-hosts`.
+
+Se a página abre, mas as pesquisas de runs/modelos devolvem 403 e os logs mostram
+`Blocked cross-origin request from http://10.17.0.253:8080`, confirma que o arranque
+inclui `--cors-allowed-origins "http://10.17.0.253:8080"`. A lista de hosts e a lista
+de origens são configurações diferentes. Atualiza o script na VM, para e volta a
+iniciar o servidor e recarrega a página. Este ajuste não altera contas ou permissões.
 
 ### Consumo de RAM elevado
 

@@ -11,9 +11,9 @@ __pycache__/
 # Local secrets
 .env
 .env.*
-!.env.example
 
 # Local data and generated artifacts
+/dataset/
 /data/
 /dataset/*
 !/dataset/*.dvc

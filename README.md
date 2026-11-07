@@ -30,7 +30,12 @@ ajustes e substitui resultados locais.
 - `docs/model-handoff.md`: entrega aos colegas.
 - `docs/baseline-results.md`: métricas e limitações reais.
 
-## Dados e integração
+O `train.py` regista `estimator`, `C` e a accuracy do teste no MLflow, na experiência
+`voo-classification`, e publica o pipeline no Registry como `voos-model`.
+Configuração e comandos: [docs/README_mlflow.md](docs/README_mlflow.md).
+Para executar apenas localmente, usa `python train.py --no-tracking`.
+API HTTP, Docker de serviço e provisionamento continuam fora desta contribuição.
+Os CSV originais ficam fora do Git em ../dataset/. DVC continua adiado.
 
 Os CSV originais ficam fora do Git. Por defeito, o treino local lê os ficheiros
 de `./dataset/`, dentro do repositório. Para usar outra pasta, executa

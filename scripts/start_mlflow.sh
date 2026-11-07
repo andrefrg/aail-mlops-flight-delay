@@ -67,6 +67,7 @@ nohup "$MLFLOW_BIN" server \
   --port 8080 \
   --workers 1 \
   --allowed-hosts "10.17.0.253:8080,localhost:8080,127.0.0.1:8080" \
+  --cors-allowed-origins "http://10.17.0.253:8080" \
   --backend-store-uri sqlite:///mlflow.db \
   --artifacts-destination ./artifacts \
   >> "$LOG_FILE" 2>&1 < /dev/null &
