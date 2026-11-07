@@ -18,10 +18,9 @@ Comandos propostos para acordar com o grupo, a partir da raiz:
 .venv/bin/python scripts/predict.py --input examples/classify_request.json
 ```
 
-O modelo já treinado está em `models/model.joblib`. O treino reutiliza o artefacto
-verificado; `train.py --retrain` repete os ajustes e substitui resultados locais.
-Para outro ambiente, o colega responsável integra as bibliotecas declaradas em
-requirements.txt e o pacote deste repositório.
+O treino guarda o modelo em `models/model.joblib` e reutiliza o artefacto
+quando este corresponde ao contexto registado. `train.py --retrain` repete os
+ajustes e substitui resultados locais.
 
 - `configs/feature_policy.csv`: justificação dos 109 campos e oito inputs iniciais.
 - `configs/baseline.json`: preparação, amostra, datas dos folds e C.
@@ -31,19 +30,22 @@ requirements.txt e o pacote deste repositório.
 - `docs/model-handoff.md`: entrega aos colegas.
 - `docs/baseline-results.md`: métricas e limitações reais.
 
-Os CSV originais ficam fora do Git em ../dataset/. DVC continua adiado.
-O repositório inclui Dockerfiles para treino e serviço da API; CI/CD,
-provisionamento e autenticação continuam fora do âmbito.
-Não se implementam nesta contribuição API HTTP, Docker de serviço, CI/CD, provisionamento,
-registry, autenticação ou registo no MLflow. São trabalho dos restantes colegas.
-Os CSV originais ficam fora do Git em ./dataset/. DVC continua adiado.
+## Dados e integração
+
+Os CSV originais ficam fora do Git. Por defeito, o treino local lê os ficheiros
+de `./dataset/`, dentro do repositório. Para usar outra pasta, executa
+`python train.py --data-dir CAMINHO`.
+
+O repositório inclui uma API HTTP, Dockerfiles de treino e serviço, e um workflow
+de CI. A integração do treino e da API com o MLflow e as restantes etapas de
+CI/CD ainda estão em preparação. DVC continua adiado.
 
 ## Docker Compose
 
 O Compose arranca a API em `http://localhost:8081`. A API carrega
 `models/model.joblib` do diretório local `models/`; treine o modelo antes de a API
-ser considerada saudável. Para usar um diretório de dados diferente do
-`../dataset` predefinido, defina `DATASET_DIR`.
+ser considerada saudável. O serviço de treino do Compose lê, por defeito,
+`../dataset/`, fora do repositório. Para usar outra pasta, define `DATASET_DIR`.
 
 ```powershell
 $env:DATASET_DIR = (Resolve-Path ..\dataset).Path

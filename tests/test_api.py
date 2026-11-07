@@ -12,7 +12,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from app import create_app, load_model
+from scripts.app import create_app, load_model
 from flight_delay.data.audit import BASE_FEATURES
 from flight_delay.models.pipeline import make_pipeline
 
@@ -113,14 +113,14 @@ class ClassifyApiTests(unittest.TestCase):
             ["on_time", "moderate_delay", "severe_delay"],
         )
 
-    def test_missing_extra_and_null_fields_are_handled(self):
+    def test_extra_and_null_fields_are_handled(self):
         model = RecordingModel()
         client = create_app(model).test_client()
         response = self.post(
             {
                 "instances": [
-                    {"Origin": "JFK", "DEP_DELAY": 55, "CAMPO_NOVO": 1},
-                    {"Origin": "ATL", "Distance": None},
+                    flight(Origin="JFK", Distance=None, DEP_DELAY=55, CAMPO_NOVO=1),
+                    flight(Origin="ATL", Distance=None),
                 ]
             },
             client,
@@ -128,6 +128,26 @@ class ClassifyApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(list(model.frame.columns), ["Origin", "Distance"])
         self.assertTrue(model.frame["Distance"].isna().all())
+        self.assertEqual(len(response.get_json()["classifications"]), 2)
+
+    def test_rejects_missing_fields_and_invalid_date(self):
+        for record in ({"Origin": "JFK"}, flight(FlightDate="data-invalida")):
+            with self.subTest(record=record):
+                response = self.post({"instances": [record]})
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("error", response.get_json())
+
+    def test_real_pipeline_accepts_unknown_categories(self):
+        training = pd.DataFrame([flight(), flight(Distance=800), flight(Distance=100)])
+        model = make_pipeline({"name": "logistic_C1.0", "C": 1.0}, {})
+        model.fit(training, ["on_time", "moderate_delay", "severe_delay"])
+        client = create_app(model).test_client()
+        alias_record = flight(Origin="UNKNOWN", Reporting_Airline="NEW")
+        alias_record["FL_DATE"] = alias_record.pop("FlightDate")
+        response = self.post(
+            {"instances": [flight(), alias_record]}, client
+        )
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.get_json()["classifications"]), 2)
 
     def test_rejects_invalid_payloads(self):
@@ -235,10 +255,9 @@ class UnknownCategoriesTests(unittest.TestCase):
         self.assertEqual(len(classifications), 2)
         self.assertTrue(set(classifications) <= {"on_time", "moderate_delay", "severe_delay"})
 
-    def test_missing_fields_are_imputed(self):
+    def test_missing_required_fields_are_rejected(self):
         response = self.client.post("/classify", json={"instances": [{"Origin": "JFK"}]})
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.get_json()["classifications"]), 1)
+        self.assertEqual(response.status_code, 400)
 
 
 class ModelAvailabilityTests(unittest.TestCase):

@@ -34,13 +34,16 @@ jobs:
       - name: Instalar as versões guardadas no lockfile
         run: uv sync --frozen
 
-      # TODO: ativar quando tests/test_api.py existir.
-#       - name: Testar a API
-#         run: uv run --frozen python -m pytest tests/test_api.py -v
+      - name: Testar a API
+        run: uv run --frozen python -m pytest tests/test_api.py -v
 
-      # TODO: ativar quando tests/test_train.py existir.
-#       - name: Testar o treino
-#         run: uv run --frozen python -m pytest tests/test_train.py -v
+      - name: Testar dados e modelo
+        run: |
+          uv run --frozen python -m pytest \
+            tests/test_data_audit.py \
+            tests/test_baseline.py \
+            tests/test_model_contract.py \
+            tests/test_training_workflow.py -v
 
       - name: Testar a promoção de modelos
         run: uv run --frozen python -m pytest tests/test_promote_model.py -v
@@ -83,7 +86,7 @@ jobs:
 #         uses: docker/build-push-action@v5
 #         with:
 #           context: .
-#           file: ./deployment/Dockerfile.api
+#           file: ./deployment/Dockerfile.serve
 #           platforms: linux/amd64
 #           push: false
 #           tags: serving:${{ github.sha }}

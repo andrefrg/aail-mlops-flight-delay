@@ -124,7 +124,7 @@ jobs:
 #         env:
 #           MODEL_ALIAS: ${{ env.COMMIT_SHA }}
 #         run: |
-#           docker run -d --name "$SERVING_CONTAINER" -p 127.0.0.1:9001:8080 \
+#           docker run -d --name "$SERVING_CONTAINER" -p 127.0.0.1:9001:8000 \
 #             -e MLFLOW_TRACKING_URI -e MLFLOW_TRACKING_USERNAME -e MLFLOW_TRACKING_PASSWORD \
 #             -e MLFLOW_MODEL_NAME -e MODEL_ALIAS \
 #             "$IMAGE_PREFIX/serving:$COMMIT_SHA"
