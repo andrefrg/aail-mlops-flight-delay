@@ -1,0 +1,2 @@
+# Dependencies used by the data/model contribution; environment integration belongs to teammate 2.
+-r requirements-baseline.txt

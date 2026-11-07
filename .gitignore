@@ -26,3 +26,9 @@ __pycache__/
 /.dvc/cache/
 /.dvc/tmp/
 /.dvc/config.local
+
+# Local MLflow database
+/mlflow.db*
+
+# MLflow Docker server data
+/mlflow/

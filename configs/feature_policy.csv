@@ -1,0 +1,110 @@
+feature,role,initial_baseline,reason
+Year,candidate,false,"Conhecido pelo calendário. Guardar para splits e monitorização; testar a sua inclusão, pois anos futuros não existem no treino."
+Quarter,candidate,false,Conhecido pelo calendário. Redundante com Month e derivável de FlightDate.
+Month,candidate,false,Conhecido pelo calendário. Candidato para sazonalidade; derivar de FlightDate.
+DayofMonth,candidate,false,Conhecido pelo calendário. Utilidade a medir; derivar de FlightDate.
+DayOfWeek,candidate,false,Conhecido pelo calendário. Candidato para padrões semanais; derivar de FlightDate.
+FlightDate,candidate,true,Data prevista do voo. Usar para splits e extrair calendário; evitar memorizar a data como categoria.
+Reporting_Airline,candidate,true,Identificação da companhia. Escolher uma representação principal; manter também para monitorização por companhia.
+DOT_ID_Reporting_Airline,candidate,false,"Identificação estável da companhia. Alternativa a Reporting_Airline; tratar como categoria, não como magnitude numérica."
+IATA_CODE_Reporting_Airline,candidate,false,Código da companhia. Redundante com os outros identificadores; códigos podem ser reutilizados ao longo do tempo.
+Tail_Number,conditional,false,Usar só com prova de que a matrícula atribuída estava disponível antes do corte e chegará na API. O valor final BTS pode refletir substituição de aeronave; elevada cardinalidade.
+Flight_Number_Reporting_Airline,candidate,false,Número planeado do voo. Tratar como categoria e combinar com companhia; não identifica sozinho uma operação única.
+OriginAirportID,candidate,false,Identificador do aeroporto planeado. Alternativa estável ao código; tratar como categoria e não como escala numérica.
+OriginAirportSeqID,candidate,false,Versão temporal do identificador do aeroporto; geralmente redundante. Usar apenas atributos e mapeamentos válidos à data do voo.
+OriginCityMarketID,candidate,false,Agrupa aeroportos do mesmo mercado. Candidato para generalização geográfica; avaliar ganho face ao aeroporto.
+Origin,candidate,true,Código do aeroporto planeado. Escolher código ou AirportID como representação principal; categoria com possibilidade de valores novos.
+OriginCityName,candidate,false,Metadado geográfico do aeroporto planeado. Redundante com identificadores; texto pode variar.
+OriginState,candidate,false,Estado do aeroporto planeado. Categoria geográfica de menor cardinalidade; candidato a acrescentar ao baseline.
+OriginStateFips,candidate,false,Outra codificação do estado; escolher apenas uma representação por estado.
+OriginStateName,candidate,false,Outra representação do estado; redundante com State e StateFips.
+OriginWac,candidate,false,"Código de área geográfica do aeroporto planeado. Admissível, mas pode ter pouca variação ou ser redundante; verificar no treino."
+DestAirportID,candidate,false,Identificador do aeroporto planeado. Alternativa estável ao código; tratar como categoria e não como escala numérica.
+DestAirportSeqID,candidate,false,Versão temporal do identificador do aeroporto; geralmente redundante. Usar apenas atributos e mapeamentos válidos à data do voo.
+DestCityMarketID,candidate,false,Agrupa aeroportos do mesmo mercado. Candidato para generalização geográfica; avaliar ganho face ao aeroporto.
+Dest,candidate,true,Código do aeroporto planeado. Escolher código ou AirportID como representação principal; categoria com possibilidade de valores novos.
+DestCityName,candidate,false,Metadado geográfico do aeroporto planeado. Redundante com identificadores; texto pode variar.
+DestState,candidate,false,Estado do aeroporto planeado. Categoria geográfica de menor cardinalidade; candidato a acrescentar ao baseline.
+DestStateFips,candidate,false,Outra codificação do estado; escolher apenas uma representação por estado.
+DestStateName,candidate,false,Outra representação do estado; redundante com State e StateFips.
+DestWac,candidate,false,"Código de área geográfica do aeroporto planeado. Admissível, mas pode ter pouca variação ou ser redundante; verificar no treino."
+CRSDepTime,candidate,true,"Hora prevista de partida, conhecida no plano. Converter HHMM em hora/minutos; validar 2400 e valores ausentes."
+DepTime,exclude,false,Operação real ou atraso observado na partida. O registo final não garante conhecimento antes da partida prevista; excluir mesmo que preveja bem a chegada.
+DepDelay,exclude,false,Operação real ou atraso observado na partida. O registo final não garante conhecimento antes da partida prevista; excluir mesmo que preveja bem a chegada.
+DepDelayMinutes,exclude,false,Operação real ou atraso observado na partida. O registo final não garante conhecimento antes da partida prevista; excluir mesmo que preveja bem a chegada.
+DepDel15,exclude,false,Operação real ou atraso observado na partida. O registo final não garante conhecimento antes da partida prevista; excluir mesmo que preveja bem a chegada.
+DepartureDelayGroups,exclude,false,Operação real ou atraso observado na partida. O registo final não garante conhecimento antes da partida prevista; excluir mesmo que preveja bem a chegada.
+DepTimeBlk,candidate,false,Bloco horário previsto de partida. Redundante com CRSDepTime; não usa a hora real.
+TaxiOut,exclude,false,Operação real ou atraso observado na partida. O registo final não garante conhecimento antes da partida prevista; excluir mesmo que preveja bem a chegada.
+WheelsOff,exclude,false,Operação real ou atraso observado na partida. O registo final não garante conhecimento antes da partida prevista; excluir mesmo que preveja bem a chegada.
+WheelsOn,exclude,false,Resultado real da chegada ou transformação do atraso. Revela diretamente o alvo ou informação posterior ao momento de previsão.
+TaxiIn,exclude,false,Resultado real da chegada ou transformação do atraso. Revela diretamente o alvo ou informação posterior ao momento de previsão.
+CRSArrTime,candidate,true,"Hora prevista de chegada, conhecida antes da partida. Uma hora de chegada futura pode ser usada se for a hora planeada."
+ArrTime,exclude,false,Resultado real da chegada ou transformação do atraso. Revela diretamente o alvo ou informação posterior ao momento de previsão.
+ArrDelay,target,false,Usar exclusivamente para construir y e verificar validade do registo; remover de X antes do treino e da inferência.
+ArrDelayMinutes,exclude,false,Resultado real da chegada ou transformação do atraso. Revela diretamente o alvo ou informação posterior ao momento de previsão.
+ArrDel15,exclude,false,Resultado real da chegada ou transformação do atraso. Revela diretamente o alvo ou informação posterior ao momento de previsão.
+ArrivalDelayGroups,exclude,false,Resultado real da chegada ou transformação do atraso. Revela diretamente o alvo ou informação posterior ao momento de previsão.
+ArrTimeBlk,candidate,false,Bloco horário previsto de chegada. Redundante com CRSArrTime; não usa a hora real.
+Cancelled,filter,false,"Usar offline para manter apenas Cancelled == 0, conforme o enunciado. Não é uma feature do modelo."
+CancellationCode,exclude,false,Resultado do cancelamento; não é entrada pré-partida e não tem utilidade na população filtrada.
+Diverted,filter,false,"Usar offline para manter apenas Diverted == 0, conforme o enunciado. Não é uma feature do modelo."
+CRSElapsedTime,candidate,true,Duração prevista. Admissível; não confundir com ActualElapsedTime nem calcular duração subtraindo horas locais sem fusos e mudança de dia.
+ActualElapsedTime,exclude,false,Duração real apurada com a operação. Não confundir com a duração prevista CRSElapsedTime.
+AirTime,exclude,false,Duração real apurada com a operação. Não confundir com a duração prevista CRSElapsedTime.
+Flights,uninformative,false,Contagem de voos. Num registo individual espera-se 1; confirmar nos dados e remover se constante. Não é um resultado de atraso.
+Distance,candidate,true,Característica da rota planeada. Candidato; testar redundância com rota e duração prevista.
+DistanceGroup,candidate,false,Grupo da distância planeada. Redundante com Distance; testar como alternativa.
+CarrierDelay,exclude,false,Minutos de atraso atribuídos a uma causa após observar a operação. Não é uma previsão meteorológica nem uma estimativa disponível antes da partida.
+WeatherDelay,exclude,false,Minutos de atraso atribuídos a uma causa após observar a operação. Não é uma previsão meteorológica nem uma estimativa disponível antes da partida.
+NASDelay,exclude,false,Minutos de atraso atribuídos a uma causa após observar a operação. Não é uma previsão meteorológica nem uma estimativa disponível antes da partida.
+SecurityDelay,exclude,false,Minutos de atraso atribuídos a uma causa após observar a operação. Não é uma previsão meteorológica nem uma estimativa disponível antes da partida.
+LateAircraftDelay,exclude,false,Minutos de atraso atribuídos a uma causa após observar a operação. Não é uma previsão meteorológica nem uma estimativa disponível antes da partida.
+FirstDepTime,exclude,false,Evento operacional real de saída/regresso à porta. Não usar o valor final para representar informação pré-partida.
+TotalAddGTime,exclude,false,Evento operacional real de saída/regresso à porta. Não usar o valor final para representar informação pré-partida.
+LongestAddGTime,exclude,false,Evento operacional real de saída/regresso à porta. Não usar o valor final para representar informação pré-partida.
+DivAirportLandings,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+DivReachedDest,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+DivActualElapsedTime,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+DivArrDelay,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+DivDistance,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div1Airport,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div1AirportID,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div1AirportSeqID,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div1WheelsOn,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div1TotalGTime,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div1LongestGTime,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div1WheelsOff,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div1TailNum,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div2Airport,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div2AirportID,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div2AirportSeqID,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div2WheelsOn,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div2TotalGTime,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div2LongestGTime,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div2WheelsOff,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div2TailNum,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div3Airport,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div3AirportID,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div3AirportSeqID,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div3WheelsOn,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div3TotalGTime,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div3LongestGTime,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div3WheelsOff,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div3TailNum,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div4Airport,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div4AirportID,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div4AirportSeqID,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div4WheelsOn,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div4TotalGTime,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div4LongestGTime,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div4WheelsOff,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div4TailNum,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div5Airport,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div5AirportID,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div5AirportSeqID,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div5WheelsOn,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div5TotalGTime,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div5LongestGTime,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div5WheelsOff,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
+Div5TailNum,exclude,false,"Resultado de um desvio, fora da população do projeto e sem disponibilidade pré-partida. Não usar sequer o padrão de valores ausentes como sinal."
