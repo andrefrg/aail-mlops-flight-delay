@@ -7,9 +7,9 @@ from pathlib import Path
 
 import joblib
 import numpy as np
-import pandas as pd
 from flask import Flask, g, jsonify, request
 from werkzeug.exceptions import HTTPException
+from flight_delay.models.inference import prepare_instances
 
 
 LOGGER = logging.getLogger(__name__)
@@ -75,8 +75,7 @@ def _parse_instances(payload, max_batch_size):
     return cleaned, None
 
 
-def _build_frame(instances, model):
-    frame = pd.DataFrame(instances)
+def _build_frame(frame, model):
     expected = getattr(model, "feature_names_in_", None)
     if expected is not None:
         # Colunas em falta -> NaN; colunas extra (ex.: DEP_DELAY) -> ignoradas.
@@ -170,7 +169,12 @@ def create_app(model=None, max_batch_size=None):
         g.n_instances = len(instances)
 
         try:
-            frame = _build_frame(instances, current_model)
+            frame = prepare_instances(instances)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        try:
+            frame = _build_frame(frame, current_model)
             raw = np.asarray(current_model.predict(frame))
         except Exception:
             LOGGER.exception("Model prediction failed (n=%d)", len(instances))
