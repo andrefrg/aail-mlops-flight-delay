@@ -15,9 +15,6 @@ __pycache__/
 
 # Local data and generated artifacts
 /data/
-/dataset/*
-!/dataset/*.dvc
-!/dataset/.gitignore
 /models/*
 !/models/.gitkeep
 /mlruns/
