@@ -20,14 +20,31 @@ prioridade sobre o ficheiro. Preenche `MLFLOW_TRACKING_USERNAME` e
 `MLFLOW_TRACKING_PASSWORD` com as credenciais da conta existente no servidor.
 O `.env` está excluído do Git. Em Docker, passa as variáveis com `--env-file .env`.
 
-Cada execução regista apenas os parâmetros `estimator` e `C` do modelo escolhido
-e a métrica `accuracy` do teste final. O modelo inclui o código de `flight_delay`
+Cada execução regista os parâmetros `estimator` e `C` do modelo escolhido.
+As métricas enviadas para o MLflow são:
+
+| Métrica | Origem |
+| --- | --- |
+| `accuracy` | Accuracy do teste final |
+| `macro_f1` | F1 médio das três classes no teste, com pesos iguais |
+| `balanced_accuracy` | Recall médio das três classes no teste |
+| `recall_severe_delay` | Recall de atrasos severos no teste |
+| `recall_moderate_delay` | Recall de atrasos moderados no teste |
+| `precision_severe_delay` | Precisão dos atrasos severos no teste |
+| `cv_accuracy_mean` | Média da accuracy nos folds de validação da variante escolhida |
+| `cv_accuracy_std` | Desvio-padrão dessas accuracies, com `ddof=0` |
+
+As métricas de teste são lidas da avaliação final; as de validação vêm de
+`reports/generated/baseline/cross_validation.csv`, filtrado pela variante escolhida.
+Não se misturam os resultados dos outros valores de C ou da referência maioritária.
+Os valores são frações entre 0 e 1. O modelo inclui o código de `flight_delay`
 necessário às suas transformações. Não se usa autologging.
 
 - `--phase prepare`: prepara dados sem contactar o MLflow.
-- `--phase train`: regista os parâmetros e o modelo, sem accuracy de teste.
-- `--phase evaluate`: regista os parâmetros, a accuracy e o modelo já existente.
-- `--phase register`: publica o modelo e a accuracy já guardados, sem preparar dados,
+- `--phase train`: regista os parâmetros, as duas métricas de validação e o modelo,
+  sem métricas de teste.
+- `--phase evaluate`: regista os parâmetros, as oito métricas e o modelo já existente.
+- `--phase register`: publica o modelo e as oito métricas já guardados, sem preparar dados,
   treinar ou avaliar novamente. Verifica os hashes do modelo, configuração e manifesto
   e identifica na run o código do treino original. Útil para repetir uma publicação
   que falhou depois de o treino terminar.

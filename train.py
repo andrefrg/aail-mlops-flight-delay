@@ -2,9 +2,12 @@
 
 import argparse
 from contextlib import nullcontext
+import csv
 import json
+import math
 import os
 from pathlib import Path
+from statistics import mean, pstdev
 import sys
 
 import joblib
@@ -30,6 +33,32 @@ def recorded_evaluation(config_path):
     if context["data_manifest_sha256"] != sha256(ROOT / "data/processed/manifest.json"):
         raise ValueError("Data manifest changed; registration cancelled")
     return selection, report["models"]["baseline"]
+
+
+def tracking_metrics(selection, result=None):
+    """Separate selected-variant validation scores from final-test metrics."""
+    with (ROOT / "reports/generated/baseline/cross_validation.csv").open(newline="") as stream:
+        scores = [
+            float(row["accuracy"])
+            for row in csv.DictReader(stream)
+            if row["model"] == selection["variant"]["name"]
+        ]
+    if not scores or not all(math.isfinite(score) for score in scores):
+        raise ValueError("Missing or invalid validation accuracies for the selected model")
+    metrics = {
+        "cv_accuracy_mean": mean(scores),
+        "cv_accuracy_std": pstdev(scores),
+    }
+    if result is not None:
+        metrics.update({
+            "accuracy": result["accuracy"],
+            "macro_f1": result["macro_f1"],
+            "balanced_accuracy": result["balanced_accuracy"],
+            "recall_severe_delay": result["classes"]["severe_delay"]["recall"],
+            "recall_moderate_delay": result["classes"]["moderate_delay"]["recall"],
+            "precision_severe_delay": result["classes"]["severe_delay"]["precision"],
+        })
+    return metrics
 
 
 def main():
@@ -70,7 +99,7 @@ def main():
     with mlflow.start_run() if mlflow is not None else nullcontext():
         if args.phase == "register":
             selection, result = recorded_evaluation(args.config)
-            print("Registering the saved model and recorded test accuracy; no retraining.", flush=True)
+            print("Registering the saved model and recorded evaluation; no retraining.", flush=True)
             if mlflow is not None:
                 mlflow.set_tags({
                     "execution_type": "register_existing",
@@ -86,9 +115,10 @@ def main():
             evaluated = evaluate_model(args.config)
             result = evaluated["baseline"]
             print(f"model.joblib: accuracy={result['accuracy']:.6f}; macro-F1={result['macro_f1']:.6f}")
-        if mlflow is not None and args.phase in ["all", "evaluate", "register"]:
-            mlflow.log_metric("accuracy", result["accuracy"])
         if mlflow is not None:
+            mlflow.log_metrics(tracking_metrics(
+                selection, result if args.phase in ["all", "evaluate", "register"] else None
+            ))
             model_info = mlflow.sklearn.log_model(
                 sk_model=joblib.load(ROOT / "models/model.joblib"),
                 name="model",
