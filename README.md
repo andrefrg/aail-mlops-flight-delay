@@ -30,7 +30,7 @@ ajustes e substitui resultados locais.
 - `docs/model-handoff.md`: entrega aos colegas.
 - `docs/baseline-results.md`: métricas e limitações reais.
 
-O `train.py` regista `estimator`, `C` e a accuracy do teste no MLflow, na experiência
+O `train.py` regista `estimator`, `C` e métricas de teste e validação cruzada no MLflow, na experiência
 `voo-classification`, e publica o pipeline no Registry como `voos-model`.
 Configuração e comandos: [docs/README_mlflow.md](docs/README_mlflow.md).
 Para executar apenas localmente, usa `python train.py --no-tracking`.
