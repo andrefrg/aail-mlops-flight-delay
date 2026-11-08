@@ -7,6 +7,7 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 from statistics import mean, pstdev
 import sys
 
@@ -59,6 +60,16 @@ def tracking_metrics(selection, result=None):
             "precision_severe_delay": result["classes"]["severe_delay"]["precision"],
         })
     return metrics
+
+
+def register_model(mlflow, model_uri, model_name, commit_sha=None):
+    """Register the logged model and identify its exact version by commit."""
+    if commit_sha and not re.fullmatch(r"[0-9a-f]{40}", commit_sha):
+        raise ValueError("COMMIT_SHA must be a full Git commit SHA")
+    version = mlflow.register_model(model_uri, model_name)
+    if commit_sha:
+        mlflow.MlflowClient().set_registered_model_alias(model_name, commit_sha, version.version)
+    return version
 
 
 def main():
@@ -128,10 +139,14 @@ def main():
                     "numpy.dtype",
                 ],
                 code_paths=[str(ROOT / "src/flight_delay")],
-                registered_model_name=os.environ.get("MLFLOW_MODEL_NAME", "voos-model"),
+            )
+            model_name = os.environ.get("MLFLOW_MODEL_NAME", "voos-model")
+            version = register_model(
+                mlflow, model_info.model_uri, model_name, os.environ.get("COMMIT_SHA")
             )
             print(f"MLflow run: {mlflow.active_run().info.run_id}", flush=True)
             print(f"MLflow model: {model_info.model_uri}", flush=True)
+            print(f"MLflow registered model: {model_name}, version {version.version}", flush=True)
 
 
 if __name__ == "__main__":

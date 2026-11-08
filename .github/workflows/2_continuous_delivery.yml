@@ -1,21 +1,106 @@
 name: 2 - Continuous Delivery
 
-# O workflow completo está comentado abaixo até a integração estar pronta.
-# Para reativar, remover este bloco e descomentar o workflow original.
 on:
+  workflow_run:
+    workflows: ["1 - Continuous Integration"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
+    inputs:
+      image_commit:
+        description: 'SHA completo de um commit da main com imagem publicada no GHCR'
+        required: true
+        type: string
 
 permissions:
   contents: read
+  packages: read
+
+concurrency:
+  group: flight-delay-promotion
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ${{ vars.REGISTRY }}
+  MLFLOW_TRACKING_URI: ${{ vars.MLFLOW_TRACKING_URI }}
+  MLFLOW_EXPERIMENT_NAME: ${{ vars.MLFLOW_EXPERIMENT_NAME }}
+  MLFLOW_MODEL_NAME: ${{ vars.MLFLOW_MODEL_NAME }}
+  MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_USERNAME }}
+  MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_PASSWORD }}
 
 jobs:
-  integration-pending:
-    runs-on: ubuntu-latest
+  train-model:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.head_branch == 'main' &&
+       (github.event.workflow_run.event == 'push' ||
+        github.event.workflow_run.event == 'workflow_dispatch'))
+    runs-on: [self-hosted, VM2]
+    timeout-minutes: 180
+    env:
+      IMAGE_COMMIT: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.image_commit }}
     steps:
-      - name: Indicar que a integração está pendente
+      - name: Validar configuração
+        shell: bash
         run: |
-          echo "::error::Esta etapa está desativada até integrar a API, o modelo, as imagens e os runners."
-          exit 1
+          if [[ ${#IMAGE_COMMIT} -ne 40 || "$IMAGE_COMMIT" == *[!0123456789abcdef]* ]]; then
+            echo "Indica o SHA completo de 40 caracteres de um commit."
+            exit 1
+          fi
+          if [[ "$REGISTRY" != 'ghcr.io' ]]; then
+            echo "Configura REGISTRY como ghcr.io."
+            exit 1
+          fi
+          : "${MLFLOW_TRACKING_URI:?Configurar MLFLOW_TRACKING_URI}"
+          : "${MLFLOW_EXPERIMENT_NAME:?Configurar MLFLOW_EXPERIMENT_NAME}"
+          : "${MLFLOW_MODEL_NAME:?Configurar MLFLOW_MODEL_NAME}"
+          repository=$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_PREFIX=$REGISTRY/$repository" >> "$GITHUB_ENV"
+
+      - name: Obter o código correspondente à imagem
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.IMAGE_COMMIT }}
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Obter dados com DVC
+        shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/dvc-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          "$RUNNER_TEMP/dvc-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/bin/python" -m pip install 'dvc[ssh]>=3,<4'
+          "$RUNNER_TEMP/dvc-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/bin/dvc" pull
+
+      - name: Autenticar no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Obter imagem de treino
+        run: docker pull "$IMAGE_PREFIX/training:$IMAGE_COMMIT"
+
+      - name: Executar treino e registo no MLflow
+        env:
+          COMMIT_SHA: ${{ env.IMAGE_COMMIT }}
+        shell: bash
+        run: |
+          docker run --rm \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/dataset,dst=/data,readonly" \
+            -e MLFLOW_TRACKING_URI -e MLFLOW_TRACKING_USERNAME -e MLFLOW_TRACKING_PASSWORD \
+            -e MLFLOW_MODEL_NAME -e MLFLOW_EXPERIMENT_NAME -e COMMIT_SHA \
+            "$IMAGE_PREFIX/training:$IMAGE_COMMIT" --data-dir /data
+
+      - name: Remover ambiente temporário do DVC
+        if: always()
+        shell: bash
+        run: rm -rf "$RUNNER_TEMP/dvc-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
 
 # Workflow original preservado:
 # # Estrutura do tutorial: treino -> E2E -> imagem e modelo em staging.
