@@ -13,7 +13,6 @@ __pycache__/
 .env.*
 
 # Local data and generated artifacts
-/dataset/
 /data/
 /models/*
 !/models/.gitkeep
