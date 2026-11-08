@@ -56,13 +56,15 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      PUBLISH_IMAGES: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
 
       - name: Preparar o endereço das imagens
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        if: env.PUBLISH_IMAGES == 'true'
         shell: bash
         run: |
           test "$REGISTRY" = 'ghcr.io'
@@ -81,7 +83,7 @@ jobs:
           outputs: type=docker,dest=/tmp/training.tar
 
       - run: docker load --input /tmp/training.tar
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        if: env.PUBLISH_IMAGES == 'true'
 
       - name: Construir imagem da API
         uses: docker/build-push-action@v5
@@ -95,10 +97,10 @@ jobs:
           outputs: type=docker,dest=/tmp/serving.tar
 
       - run: docker load --input /tmp/serving.tar
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        if: env.PUBLISH_IMAGES == 'true'
 
       - name: Autenticar no GHCR
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        if: env.PUBLISH_IMAGES == 'true'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -106,26 +108,25 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publicar imagem de treino
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        if: env.PUBLISH_IMAGES == 'true'
         run: |
           docker tag "training:$GITHUB_SHA" "$IMAGE_PREFIX/training:$GITHUB_SHA"
           docker push "$IMAGE_PREFIX/training:$GITHUB_SHA"
 
       - name: Publicar imagem da API
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        if: env.PUBLISH_IMAGES == 'true'
         run: |
           docker tag "serving:$GITHUB_SHA" "$IMAGE_PREFIX/serving:$GITHUB_SHA"
           docker push "$IMAGE_PREFIX/serving:$GITHUB_SHA"
 
-#       # As etapas seguintes recebem o SHA original, não o SHA implícito de workflow_run.
-#       - name: Guardar o commit que iniciou a cadeia
-#         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-#         run: echo "$GITHUB_SHA" > "$RUNNER_TEMP/source-commit.txt"
+      - name: Guardar o commit da imagem publicada
+        if: env.PUBLISH_IMAGES == 'true'
+        run: echo "$GITHUB_SHA" > "$RUNNER_TEMP/source-commit.txt"
 
-#       - uses: actions/upload-artifact@v4
-#         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-#         with:
-#           name: source-commit
-#           path: ${{ runner.temp }}/source-commit.txt
-#           if-no-files-found: error
-#           retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: env.PUBLISH_IMAGES == 'true'
+        with:
+          name: source-commit
+          path: ${{ runner.temp }}/source-commit.txt
+          if-no-files-found: error
+          retention-days: 14
