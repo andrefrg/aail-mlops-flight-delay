@@ -56,3 +56,21 @@ docker compose up --build
 ```
 
 O serviço `train` só é iniciado explicitamente com o perfil `training`.
+
+## Treino no GitHub Actions
+
+O workflow `2 - Continuous Delivery` arranca automaticamente após um CI
+bem-sucedido na `main`, num runner self-hosted com o label `VM2`. Obtém os dados
+pelo DVC, executa a imagem correspondente ao commit do CI e regista o modelo no
+MLflow. Também pode ser iniciado manualmente em Actions com `Run workflow`;
+nesse caso, indica o SHA completo de um commit da `main` cuja imagem de treino
+já tenha sido publicada no GHCR.
+
+O runner precisa de Docker, acesso por SSH ao remote DVC e acesso ao servidor
+MLflow. Configura as variáveis `REGISTRY`, `MLFLOW_TRACKING_URI`,
+`MLFLOW_EXPERIMENT_NAME` e `MLFLOW_MODEL_NAME` no GitHub; se o MLflow exigir
+autenticação, configura também os secrets `MLFLOW_USERNAME` e `MLFLOW_PASSWORD`.
+O acesso ao DVC tem de funcionar sem interação no runner. Os CSVs ocupam cerca
+de 6 GB, além do espaço necessário para a cache e o treino.
+
+Os testes E2E e a promoção ainda estão por integrar e validar.
