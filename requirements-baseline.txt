@@ -5,3 +5,5 @@ scikit-learn==1.7.2
 scipy==1.15.3
 pyarrow==25.0.1
 joblib==1.6.0
+mlflow>=3.18.0
+python-dotenv>=1,<2

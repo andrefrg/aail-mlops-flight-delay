@@ -30,25 +30,27 @@ ajustes e substitui resultados locais.
 - `docs/model-handoff.md`: entrega aos colegas.
 - `docs/baseline-results.md`: métricas e limitações reais.
 
-## Dados e integração
-
+O `train.py` regista `estimator`, `C` e a accuracy do teste no MLflow, na experiência
+`voo-classification`, e publica o pipeline no Registry como `voos-model`.
+Configuração e comandos: [docs/README_mlflow.md](docs/README_mlflow.md).
+Para executar apenas localmente, usa `python train.py --no-tracking`.
 Os CSV originais ficam fora do Git. Por defeito, o treino local lê os ficheiros
 de `./dataset/`, dentro do repositório. Para usar outra pasta, executa
 `python train.py --data-dir CAMINHO`.
 
 O repositório inclui uma API HTTP, Dockerfiles de treino e serviço, e um workflow
-de CI. A integração do treino e da API com o MLflow e as restantes etapas de
-CI/CD ainda estão em preparação. DVC continua adiado.
+de CI. O treino regista modelos no MLflow; a integração da API com o MLflow e as
+restantes etapas de CI/CD ainda estão em preparação.
 
 ## Docker Compose
 
 O Compose arranca a API em `http://localhost:8081`. A API carrega
 `models/model.joblib` do diretório local `models/`; treine o modelo antes de a API
 ser considerada saudável. O serviço de treino do Compose lê, por defeito,
-`../dataset/`, fora do repositório. Para usar outra pasta, define `DATASET_DIR`.
+`./dataset/`, dentro do repositório. Para usar outra pasta, define `DATASET_DIR`.
 
 ```powershell
-$env:DATASET_DIR = (Resolve-Path ..\dataset).Path
+$env:DATASET_DIR = (Resolve-Path .\dataset).Path
 docker compose --profile training run --build --rm train
 docker compose up --build
 ```

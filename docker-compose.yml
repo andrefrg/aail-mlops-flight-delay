@@ -17,9 +17,15 @@ services:
     profiles:
       - training
     command: ["--data-dir", "/data"]
+    environment:
+      - MLFLOW_TRACKING_URI
+      - MLFLOW_EXPERIMENT_NAME
+      - MLFLOW_MODEL_NAME
+      - MLFLOW_TRACKING_USERNAME
+      - MLFLOW_TRACKING_PASSWORD
     volumes:
       - type: bind
-        source: ${DATASET_DIR:-../dataset}
+        source: ${DATASET_DIR:-./dataset}
         target: /data
         read_only: true
       - ./data:/app/data
