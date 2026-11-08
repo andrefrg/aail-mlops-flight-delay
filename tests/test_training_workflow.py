@@ -3,8 +3,9 @@
 import json
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import joblib
 import pandas as pd
@@ -13,9 +14,27 @@ from sklearn.linear_model import LogisticRegression
 from flight_delay.data.prepare import prepare
 from flight_delay.models import training
 from test_baseline import fixture
+from train import register_model
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_commit_alias_points_to_registered_version(self):
+        mlflow = Mock()
+        mlflow.register_model.return_value = SimpleNamespace(version="7")
+        sha = "a" * 40
+
+        register_model(mlflow, "models:/example", "model", sha)
+
+        mlflow.MlflowClient.return_value.set_registered_model_alias.assert_called_once_with(
+            "model", sha, "7"
+        )
+
+    def test_invalid_commit_is_not_registered(self):
+        mlflow = Mock()
+        with self.assertRaises(ValueError):
+            register_model(mlflow, "models:/example", "model", "invalid")
+        mlflow.register_model.assert_not_called()
+
     def test_selection_uses_accuracy_and_excludes_majority(self):
         rows = pd.DataFrame(
             [

@@ -87,12 +87,14 @@ jobs:
         run: docker pull "$IMAGE_PREFIX/training:$IMAGE_COMMIT"
 
       - name: Executar treino e registo no MLflow
+        env:
+          COMMIT_SHA: ${{ env.IMAGE_COMMIT }}
         shell: bash
         run: |
           docker run --rm \
             --mount "type=bind,src=$GITHUB_WORKSPACE/dataset,dst=/data,readonly" \
             -e MLFLOW_TRACKING_URI -e MLFLOW_TRACKING_USERNAME -e MLFLOW_TRACKING_PASSWORD \
-            -e MLFLOW_MODEL_NAME -e MLFLOW_EXPERIMENT_NAME \
+            -e MLFLOW_MODEL_NAME -e MLFLOW_EXPERIMENT_NAME -e COMMIT_SHA \
             "$IMAGE_PREFIX/training:$IMAGE_COMMIT" --data-dir /data
 
       - name: Remover ambiente temporário do DVC
