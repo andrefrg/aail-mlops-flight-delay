@@ -40,6 +40,11 @@ jobs:
           github.event.workflow_run.event == 'workflow_dispatch'))))
     runs-on: [self-hosted, vm03]
     timeout-minutes: 180
+    outputs:
+      image_commit: ${{ steps.config.outputs.image_commit }}
+      serving_image: ${{ steps.serving.outputs.image }}
+    env:
+      SERVING_CONTAINER: flight-delay-api-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Obter o commit da imagem publicada pelo CI
         if: github.event_name == 'workflow_run'
@@ -51,6 +56,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Validar configuração
+        id: config
         env:
           MANUAL_COMMIT: ${{ inputs.image_commit }}
         shell: bash
@@ -74,6 +80,7 @@ jobs:
           repository=$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
           echo "IMAGE_PREFIX=$REGISTRY/$repository" >> "$GITHUB_ENV"
           echo "IMAGE_COMMIT=$IMAGE_COMMIT" >> "$GITHUB_ENV"
+          echo "image_commit=$IMAGE_COMMIT" >> "$GITHUB_OUTPUT"
 
       - name: Obter o código correspondente à imagem
         uses: actions/checkout@v4
@@ -109,150 +116,121 @@ jobs:
             -e MLFLOW_MODEL_NAME -e MLFLOW_EXPERIMENT_NAME -e COMMIT_SHA \
             "$IMAGE_PREFIX/training:$IMAGE_COMMIT" --data-dir /data
 
+      - name: Obter imagem da API
+        id: serving
+        shell: bash
+        run: |
+          repository="$IMAGE_PREFIX/serving"
+          tagged_image="$repository:$IMAGE_COMMIT"
+          docker pull "$tagged_image"
+          # Guardar o digest para testar e promover a mesma imagem.
+          image=$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$tagged_image" |
+            awk -v prefix="$repository@sha256:" 'index($0, prefix) == 1 && !found { print; found = 1 }')
+          if [[ -z "$image" ]]; then
+            echo "Não foi possível determinar o digest da imagem $tagged_image."
+            exit 1
+          fi
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+
+      - name: Iniciar API com o modelo do treino
+        env:
+          SERVING_IMAGE: ${{ steps.serving.outputs.image }}
+        run: |
+          docker run -d \
+            --name "$SERVING_CONTAINER" \
+            -p 127.0.0.1:8081:8000 \
+            -e MLFLOW_TRACKING_URI -e MLFLOW_TRACKING_USERNAME -e MLFLOW_TRACKING_PASSWORD \
+            -e MLFLOW_MODEL_NAME \
+            -e "MODEL_ALIAS=$IMAGE_COMMIT" \
+            -e "MODEL_VERSION=$IMAGE_COMMIT" \
+            "$SERVING_IMAGE"
+
+      - name: Testar a API com o modelo treinado
+        env:
+          API_BASE_URL: http://127.0.0.1:8081
+        run: python3 -m unittest discover -s tests -p test_e2e.py -v
+
+      - name: Mostrar logs da API se o job falhar
+        if: failure()
+        run: docker logs "$SERVING_CONTAINER" || true
+
+      - name: Remover o container da API
+        if: always()
+        run: docker rm -f "$SERVING_CONTAINER" || true
+
       - name: Remover ambiente temporário do DVC
         if: always()
         shell: bash
         run: rm -rf "$RUNNER_TEMP/dvc-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
 
-# Workflow original preservado:
-# # Estrutura do tutorial: treino -> E2E -> imagem e modelo em staging.
-# name: 2 - Continuous Delivery
-# run-name: "${{ github.workflow }}"
-#
-# on:
-#   workflow_run:
-#     workflows: ["1 - Continuous Integration"]
-#     types: [completed]
-#     branches: [main]
-#
-# permissions:
-#   contents: read
-#   actions: read
-#   packages: write
-#
-# # O mesmo grupo nas etapas 2/3/4 impede alterações simultâneas dos aliases/tags.
-# concurrency:
-#   group: flight-delay-promotion
-#   cancel-in-progress: false
-#
-# env:
-#   REGISTRY: ${{ vars.REGISTRY }}
-#   MLFLOW_TRACKING_URI: ${{ vars.MLFLOW_TRACKING_URI }}
-#   MLFLOW_EXPERIMENT_NAME: ${{ vars.MLFLOW_EXPERIMENT_NAME }}
-#   MLFLOW_MODEL_NAME: ${{ vars.MLFLOW_MODEL_NAME }}
-#   MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_USERNAME }}
-#   MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_PASSWORD }}
-#   TRAIN_DATA_DIR: ${{ vars.TRAIN_DATA_DIR }}
-#   SERVING_CONTAINER: flight-delay-delivery-${{ github.run_id }}-${{ github.run_attempt }}
-#   TRAINING_CONTAINER: flight-delay-training-${{ github.run_id }}-${{ github.run_attempt }}
-#   API_BASE_URL: http://127.0.0.1:9001
-#
-# jobs:
-#   train-model:
-#     if: >-
-#       github.event.workflow_run.conclusion == 'success' &&
-#       github.event.workflow_run.head_repository.full_name == github.repository &&
-#       github.event.workflow_run.head_branch == 'main' &&
-#       (github.event.workflow_run.event == 'push' ||
-#        github.event.workflow_run.event == 'workflow_dispatch')
-#     runs-on: [self-hosted, linux, x64, dei-training]
-#     timeout-minutes: 180
-#     steps:
-#       - name: Obter o commit da execução anterior
-#         uses: actions/download-artifact@v4
-#         with:
-#           name: source-commit
-#           path: ${{ runner.temp }}/flight-delivery
-#           run-id: ${{ github.event.workflow_run.id }}
-#           github-token: ${{ secrets.GITHUB_TOKEN }}
-#
-#       - name: Preparar commit e endereço das imagens
-#         env:
-#           EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
-#         shell: bash
-#         run: |
-#           COMMIT_SHA=$(cat "$RUNNER_TEMP/flight-delivery/source-commit.txt")
-#           [[ "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]]
-#           test "$COMMIT_SHA" = "$EXPECTED_SHA"
-#           test "$REGISTRY" = 'ghcr.io'
-#           echo "COMMIT_SHA=$COMMIT_SHA" >> "$GITHUB_ENV"
-#           echo "IMAGE_PREFIX=$REGISTRY/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
-#
-#       - uses: actions/checkout@v4
-#         with:
-#           ref: ${{ env.COMMIT_SHA }}
-#           persist-credentials: false
-#
-#       - uses: actions/setup-python@v5
-#         with:
-#           python-version: '3.10'
-#
-#       - run: python -m pip install uv==0.9.5
-#       - run: uv sync --frozen
-#
-#       - uses: docker/login-action@v3
-#         with:
-#           registry: ${{ env.REGISTRY }}
-#           username: ${{ github.actor }}
-#           password: ${{ secrets.GITHUB_TOKEN }}
-#
-#       - name: Obter imagem de treino
-#         run: docker pull "$IMAGE_PREFIX/training:$COMMIT_SHA"
-#
-#       - name: Executar treino e registo do modelo
-#         shell: bash
-#         run: |
-#           : "${MLFLOW_TRACKING_URI:?Configurar MLFLOW_TRACKING_URI}"
-#           : "${MLFLOW_EXPERIMENT_NAME:?Configurar MLFLOW_EXPERIMENT_NAME}"
-#           : "${MLFLOW_MODEL_NAME:?Configurar MLFLOW_MODEL_NAME}"
-#           : "${TRAIN_DATA_DIR:?Configurar TRAIN_DATA_DIR}"
-#           [[ "$TRAIN_DATA_DIR" = /* ]] && test -d "$TRAIN_DATA_DIR"
-#           docker run --rm --name "$TRAINING_CONTAINER" \
-#             --mount "type=bind,src=$TRAIN_DATA_DIR,dst=/data,readonly" \
-#             -e DATA_DIR=/data \
-#             -e MLFLOW_TRACKING_URI -e MLFLOW_TRACKING_USERNAME -e MLFLOW_TRACKING_PASSWORD \
-#             -e MLFLOW_MODEL_NAME -e MLFLOW_EXPERIMENT_NAME -e COMMIT_SHA \
-#             "$IMAGE_PREFIX/training:$COMMIT_SHA"
-#
-#       - name: Obter imagem da API
-#         run: docker pull "$IMAGE_PREFIX/serving:$COMMIT_SHA"
-#
-#       - name: Iniciar API com o modelo deste commit
-#         env:
-#           MODEL_ALIAS: ${{ env.COMMIT_SHA }}
-#         run: |
-#           docker run -d --name "$SERVING_CONTAINER" -p 127.0.0.1:9001:8000 \
-#             -e MLFLOW_TRACKING_URI -e MLFLOW_TRACKING_USERNAME -e MLFLOW_TRACKING_PASSWORD \
-#             -e MLFLOW_MODEL_NAME -e MODEL_ALIAS \
-#             "$IMAGE_PREFIX/serving:$COMMIT_SHA"
-#
-#       - name: Testar a integração da API com o modelo
-#         run: uv run --frozen python -m pytest tests/test_e2e.py -v
-#
-#       - name: Publicar imagem com tag staging
-#         run: |
-#           docker tag "$IMAGE_PREFIX/serving:$COMMIT_SHA" "$IMAGE_PREFIX/serving:staging"
-#           docker push "$IMAGE_PREFIX/serving:staging"
-#
-#       - name: Promover modelo para staging
-#         env:
-#           FROM_ALIAS: ${{ env.COMMIT_SHA }}
-#           TO_ALIAS: staging
-#         run: uv run --frozen python model_promotion/promote_model.py
-#
-#       - name: Mostrar logs em caso de erro
-#         if: failure()
-#         run: docker logs "$SERVING_CONTAINER" || true
-#
-#       - name: Remover containers temporários
-#         if: always()
-#         run: |
-#           docker rm -f "$SERVING_CONTAINER" "$TRAINING_CONTAINER" >/dev/null 2>&1 || true
-#
-#       - name: Passar o commit para a etapa de staging
-#         uses: actions/upload-artifact@v4
-#         with:
-#           name: source-commit
-#           path: ${{ runner.temp }}/flight-delivery/source-commit.txt
-#           if-no-files-found: error
-#           retention-days: 14
+  promote-staging:
+    needs: train-model
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.head_branch == 'main' &&
+      (github.event.workflow_run.event == 'push' ||
+       github.event.workflow_run.event == 'workflow_dispatch')
+    runs-on: [self-hosted, vm03]
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    env:
+      COMMIT_SHA: ${{ needs.train-model.outputs.image_commit }}
+      SERVING_IMAGE: ${{ needs.train-model.outputs.serving_image }}
+    steps:
+      - name: Confirmar o commit validado na main
+        env:
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          if [[ -z "$COMMIT_SHA" || "$COMMIT_SHA" != "$EXPECTED_SHA" ]]; then
+            echo "O commit testado não corresponde ao commit do CI da main."
+            exit 1
+          fi
+
+      - name: Obter o script de promoção do commit validado
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.COMMIT_SHA }}
+          persist-credentials: false
+
+      - name: Autenticar no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publicar a imagem testada com a tag staging
+        shell: bash
+        run: |
+          docker pull "$SERVING_IMAGE"
+          staging_image="${SERVING_IMAGE%@*}:staging"
+          docker tag "$SERVING_IMAGE" "$staging_image"
+          docker push "$staging_image"
+
+      - name: Atribuir o alias staging ao modelo testado
+        env:
+          FROM_ALIAS: ${{ env.COMMIT_SHA }}
+          TO_ALIAS: staging
+        shell: bash
+        run: |
+          docker run --rm --entrypoint python \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/model_promotion/promote_model.py,dst=/app/promote_model.py,readonly" \
+            -e MLFLOW_TRACKING_URI -e MLFLOW_TRACKING_USERNAME -e MLFLOW_TRACKING_PASSWORD \
+            -e MLFLOW_MODEL_NAME -e FROM_ALIAS -e TO_ALIAS -e COMMIT_SHA \
+            "$SERVING_IMAGE" /app/promote_model.py
+
+      - name: Guardar o commit promovido
+        run: printf '%s\n' "$COMMIT_SHA" > "$RUNNER_TEMP/source-commit.txt"
+
+      - name: Publicar o commit para a etapa de staging
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-commit
+          path: ${{ runner.temp }}/source-commit.txt
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 14

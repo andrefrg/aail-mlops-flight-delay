@@ -32,14 +32,35 @@ def _configure_logging():
 
 
 def load_model(model_path=None):
-    path = Path(model_path or os.environ.get("MODEL_PATH", DEFAULT_MODEL_PATH))
-    try:
-        model = joblib.load(path)
-    except (OSError, EOFError, ValueError, ImportError, pickle.UnpicklingError) as exc:
-        LOGGER.exception("Unable to load model from %s", path)
-        raise RuntimeError(f"Unable to load model from {path}") from exc
+    model_alias = os.environ.get("MODEL_ALIAS")
+
+    if model_path is None and model_alias:
+        model_name = os.environ.get("MLFLOW_MODEL_NAME")
+        if not model_name:
+            raise RuntimeError("MLFLOW_MODEL_NAME is required when MODEL_ALIAS is set.")
+
+        source = f"models:/{model_name}@{model_alias}"
+        try:
+            import mlflow.sklearn
+
+            model = mlflow.sklearn.load_model(source)
+        except Exception as exc:
+            LOGGER.exception("Unable to load model from %s", source)
+            raise RuntimeError(f"Unable to load model from {source}") from exc
+    else:
+        source = Path(
+            model_path if model_path is not None
+            else os.environ.get("MODEL_PATH", DEFAULT_MODEL_PATH)
+        )
+        try:
+            model = joblib.load(source)
+        except (OSError, EOFError, ValueError, ImportError, pickle.UnpicklingError) as exc:
+            LOGGER.exception("Unable to load model from %s", source)
+            raise RuntimeError(f"Unable to load model from {source}") from exc
+
     if not callable(getattr(model, "predict", None)):
-        raise RuntimeError(f"Model loaded from {path} does not provide predict().")
+        raise RuntimeError(f"Model loaded from {source} does not provide predict().")
+
     return model
 
 
