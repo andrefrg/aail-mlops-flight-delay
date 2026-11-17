@@ -38,7 +38,7 @@ jobs:
         (github.event.workflow_run.head_branch == 'main' &&
          (github.event.workflow_run.event == 'push' ||
           github.event.workflow_run.event == 'workflow_dispatch'))))
-    runs-on: [self-hosted, VM2]
+    runs-on: [self-hosted, vm03]
     timeout-minutes: 180
     steps:
       - name: Obter o commit da imagem publicada pelo CI

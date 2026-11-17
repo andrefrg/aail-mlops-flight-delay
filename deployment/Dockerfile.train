@@ -6,6 +6,6 @@ COPY src ./src
 COPY scripts ./scripts
 COPY configs ./configs
 COPY train.py ./
-RUN mkdir -p data/processed models reports docs
+RUN mkdir -p data models reports docs
 ENTRYPOINT ["python", "train.py"]
 CMD ["--data-dir", "/data"]
