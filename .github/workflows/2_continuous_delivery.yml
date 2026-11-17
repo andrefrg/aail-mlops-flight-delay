@@ -40,6 +40,8 @@ jobs:
           github.event.workflow_run.event == 'workflow_dispatch'))))
     runs-on: [self-hosted, vm03]
     timeout-minutes: 180
+    env:
+      SERVING_CONTAINER: flight-delay-api-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Obter o commit da imagem publicada pelo CI
         if: github.event_name == 'workflow_run'
@@ -108,6 +110,33 @@ jobs:
             -e MLFLOW_TRACKING_URI -e MLFLOW_TRACKING_USERNAME -e MLFLOW_TRACKING_PASSWORD \
             -e MLFLOW_MODEL_NAME -e MLFLOW_EXPERIMENT_NAME -e COMMIT_SHA \
             "$IMAGE_PREFIX/training:$IMAGE_COMMIT" --data-dir /data
+
+      - name: Obter imagem da API
+        run: docker pull "$IMAGE_PREFIX/serving:$IMAGE_COMMIT"
+
+      - name: Iniciar API com o modelo do treino
+        run: |
+          docker run -d \
+            --name "$SERVING_CONTAINER" \
+            -p 127.0.0.1:8081:8000 \
+            -e MLFLOW_TRACKING_URI -e MLFLOW_TRACKING_USERNAME -e MLFLOW_TRACKING_PASSWORD \
+            -e MLFLOW_MODEL_NAME \
+            -e "MODEL_ALIAS=$IMAGE_COMMIT" \
+            -e "MODEL_VERSION=$IMAGE_COMMIT" \
+            "$IMAGE_PREFIX/serving:$IMAGE_COMMIT"
+
+      - name: Testar a API com o modelo treinado
+        env:
+          API_BASE_URL: http://127.0.0.1:8081
+        run: python3 -m unittest discover -s tests -p test_e2e.py -v
+
+      - name: Mostrar logs da API se o job falhar
+        if: failure()
+        run: docker logs "$SERVING_CONTAINER" || true
+
+      - name: Remover o container da API
+        if: always()
+        run: docker rm -f "$SERVING_CONTAINER" || true
 
       - name: Remover ambiente temporário do DVC
         if: always()
