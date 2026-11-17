@@ -1,4 +1,3 @@
-# Estrutura do tutorial do docente: testes -> build -> publicação.
 name: 1 - Continuous Integration
 run-name: "${{ github.workflow }}"
 

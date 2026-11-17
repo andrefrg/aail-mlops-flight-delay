@@ -1,7 +1,5 @@
 name: 4 - Continuous Deployment
 
-# O workflow completo está comentado abaixo até a integração estar pronta.
-# Para reativar, remover este bloco e descomentar o workflow original.
 on:
   workflow_dispatch:
 
