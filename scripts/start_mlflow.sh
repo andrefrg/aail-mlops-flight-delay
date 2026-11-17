@@ -66,8 +66,8 @@ nohup "$MLFLOW_BIN" server \
   --host 0.0.0.0 \
   --port 8080 \
   --workers 1 \
-  --allowed-hosts "10.17.0.253:8080,localhost:8080,127.0.0.1:8080" \
-  --cors-allowed-origins "http://10.17.0.253:8080" \
+  --allowed-hosts "10.17.0.234:8080,localhost:8080,127.0.0.1:8080" \
+  --cors-allowed-origins "http://10.17.0.234:8080" \
   --backend-store-uri sqlite:///mlflow.db \
   --artifacts-destination ./artifacts \
   >> "$LOG_FILE" 2>&1 < /dev/null &
@@ -80,6 +80,6 @@ if ! kill -0 "$pid" 2>/dev/null; then
   tail -n 20 "$LOG_FILE" >&2
   exit 1
 fi
-echo "MLflow com autenticacao lancado (PID $pid): http://10.17.0.253:8080"
+echo "MLflow com autenticacao lancado (PID $pid): http://10.17.0.234:8080"
 echo "Utilizador inicial: username. As contas e permissoes ficam em basic_auth.db."
 echo "Logs: $LOG_FILE"

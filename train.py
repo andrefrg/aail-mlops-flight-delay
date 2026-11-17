@@ -104,7 +104,7 @@ def main():
         import mlflow
         import mlflow.sklearn
 
-        mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "http://10.17.0.253:8080"))
+        mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "http://10.17.0.234:8080"))
         mlflow.set_experiment(os.environ.get("MLFLOW_EXPERIMENT_NAME", "voo-classification"))
 
     with mlflow.start_run() if mlflow is not None else nullcontext():

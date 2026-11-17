@@ -2,7 +2,7 @@
 
 ## Integração com o treino
 
-O `train.py` liga-se por omissão a `http://10.17.0.253:8080`, usa a experiência
+O `train.py` liga-se por omissão a `http://10.17.0.234:8080`, usa a experiência
 `voo-classification` e publica o pipeline completo no Model Registry como `voos-model`.
 O Registry usa o mesmo servidor do tracking.
 
@@ -67,7 +67,7 @@ Esta pasta contém scripts para iniciar e terminar o servidor MLflow numa VM Deb
 
 | Opção                      | Valor                                   |
 | ---------------------------- | --------------------------------------- |
-| Endereço de acesso          | `http://10.17.0.253:8080`             |
+| Endereço de acesso          | `http://10.17.0.234:8080`             |
 | Interface de escuta          | `0.0.0.0` (todas as interfaces da VM) |
 | Porta                        | `8080/TCP`                            |
 | Workers                      | `1`                                   |
@@ -110,7 +110,7 @@ Para reproduzir a instalação no futuro, regista as versões instaladas:
 No PowerShell do computador local:
 
 ```powershell
-sftp utilizador@10.17.0.253
+sftp utilizador@10.17.0.234
 ```
 
 Na sessão SFTP:
@@ -156,7 +156,7 @@ Podes fechar a sessão SSH depois do arranque. O processo continua a executar, m
 No browser do teu computador, abre:
 
 ```text
-http://10.17.0.253:8080
+http://10.17.0.234:8080
 ```
 
 O computador precisa de acesso à rede da VM, diretamente ou através de VPN, e a infraestrutura e a firewall precisam de permitir a porta TCP 8080.
@@ -168,7 +168,7 @@ Num programa Python na máquina de treino, com o pacote `mlflow` instalado:
 ```python
 import mlflow
 
-mlflow.set_tracking_uri("http://10.17.0.253:8080")
+mlflow.set_tracking_uri("http://10.17.0.234:8080")
 mlflow.set_experiment("teste-ligacao")
 
 # Define primeiro as credenciais no ambiente (ver a secção de autenticação).
@@ -241,7 +241,7 @@ Edita as opções em `start_mlflow.sh` com o servidor parado:
 - `--port`: porta de acesso ao servidor. Se a alterares, atualiza também a verificação `ss`, os valores de `--allowed-hosts` e a mensagem com o URL no script.
 - `--allowed-hosts`: nomes e endereços aceites no cabeçalho HTTP `Host`. Atualiza esta lista se mudares o IP ou passares a usar DNS. Esta opção não é uma lista de IPs de clientes autorizados.
 - `--cors-allowed-origins`: origens aceites nos pedidos do browser. O script autoriza
-  `http://10.17.0.253:8080`. Atualiza também este valor se mudares o endereço, porta
+  `http://10.17.0.234:8080`. Atualiza também este valor se mudares o endereço, porta
   ou protocolo de acesso à interface.
 - `--workers`: quantidade de processos que atendem pedidos. Um worker reduz o consumo de RAM; mais workers podem ajudar com pedidos simultâneos, mas aumentam o consumo de recursos.
 - `--backend-store-uri`: localização da base de dados. O caminho SQLite atual é relativo à pasta dos scripts.
@@ -274,7 +274,7 @@ chmod 600 basic_auth.ini
 bash start_mlflow.sh
 ```
 
-Se o servidor já estiver parado, omite o comando de paragem. Abre `http://10.17.0.253:8080` e entra com as credenciais acima.
+Se o servidor já estiver parado, omite o comando de paragem. Abre `http://10.17.0.234:8080` e entra com as credenciais acima.
 
 As credenciais de `basic_auth.ini` criam o administrador no primeiro arranque. Se já existir uma base de autenticação com uma conta criada, mantêm-se as credenciais dessa conta; alterar o INI não repõe a sua palavra-passe. Gere alterações de contas pela API de autenticação do MLflow.
 
@@ -294,7 +294,7 @@ O script de paragem termina o processo sem pedir login. Mantém as contas, permi
 No PowerShell, antes de executar o treino:
 
 ```powershell
-$env:MLFLOW_TRACKING_URI = "http://10.17.0.253:8080"
+$env:MLFLOW_TRACKING_URI = "http://10.17.0.234:8080"
 $env:MLFLOW_TRACKING_USERNAME = MLFLOW_USERNAME
 $env:MLFLOW_TRACKING_PASSWORD = MLFLOW_PASSWORD
 ```
@@ -302,12 +302,12 @@ $env:MLFLOW_TRACKING_PASSWORD = MLFLOW_PASSWORD
 Em Linux:
 
 ```bash
-export MLFLOW_TRACKING_URI=http://10.17.0.253:8080
+export MLFLOW_TRACKING_URI=http://10.17.0.234:8080
 export MLFLOW_TRACKING_USERNAME= MLFLOW_USERNAME
 export MLFLOW_TRACKING_PASSWORD= MLFLOW_PASSWORD
 ```
 
-O código Python pode continuar a usar `mlflow.set_tracking_uri("http://10.17.0.253:8080")`; o cliente lê as credenciais das variáveis de ambiente. Configura-as também em qualquer API que carregue modelos deste servidor.
+O código Python pode continuar a usar `mlflow.set_tracking_uri("http://10.17.0.234:8080")`; o cliente lê as credenciais das variáveis de ambiente. Configura-as também em qualquer API que carregue modelos deste servidor.
 
 ### Confirmar que a autenticação funciona
 
@@ -356,8 +356,8 @@ sed -i 's/\r$//' start_mlflow.sh stop_mlflow.sh
 Verifica primeiro os logs e a porta na VM. Se o acesso local funcionar, confirma o IP, a ligação de rede ou VPN e as regras de firewall. Uma resposta de rejeição do cabeçalho `Host` exige verificar `--allowed-hosts`.
 
 Se a página abre, mas as pesquisas de runs/modelos devolvem 403 e os logs mostram
-`Blocked cross-origin request from http://10.17.0.253:8080`, confirma que o arranque
-inclui `--cors-allowed-origins "http://10.17.0.253:8080"`. A lista de hosts e a lista
+`Blocked cross-origin request from http://10.17.0.234:8080`, confirma que o arranque
+inclui `--cors-allowed-origins "http://10.17.0.234:8080"`. A lista de hosts e a lista
 de origens são configurações diferentes. Atualiza o script na VM, para e volta a
 iniciar o servidor e recarrega a página. Este ajuste não altera contas ou permissões.
 
