@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from flight_delay.data.audit import BASE_FEATURES
 from flight_delay.data.prepare import prepare, priority
 from flight_delay.features.build import FlightFeatures, canonical_inputs
-from flight_delay.models.evaluation import metrics
+from flight_delay.models.evaluation import metrics, parquet_files
 from flight_delay.models.inference import classify_payload
 from flight_delay.models.pipeline import CLASSES, make_pipeline
 from flight_delay.models.training import before
@@ -82,11 +82,31 @@ class BaselineTests(unittest.TestCase):
             a = pd.read_parquet(root / "one/monthly_sample.parquet")
             b = pd.read_parquet(root / "two/monthly_sample.parquet")
             pd.testing.assert_frame_equal(a, b)
+            self.assertEqual(one["schema_version"], 2)
+            self.assertNotIn("split", a.columns)
+            self.assertNotIn("split", one["monthly_counts"][0])
+            self.assertTrue(list((root / "one/monthly").glob("month=*/*.parquet")))
+            self.assertFalse((root / "one/train").exists())
             self.assertEqual(one["counts"], two["counts"])
             self.assertEqual(one["counts"]["eligible"], 30)
             self.assertEqual(one["counts"]["prepared"], 28)
             self.assertEqual(one["counts"]["invalid_duration_to_missing"], 2)
             self.assertEqual(content, {p.name: p.read_bytes() for p in raw.iterdir()})
+
+    def test_monthly_reader_and_legacy_compatibility(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            old = root / "validation/month=2023-01/part.parquet"
+            old.parent.mkdir(parents=True)
+            old.touch()
+            self.assertEqual(list(parquet_files(root, "2023-01-01", "2023-04-01")), [old])
+            new = root / "monthly/month=2023-01/part.parquet"
+            new.parent.mkdir(parents=True)
+            new.touch()
+            with self.assertRaises(ValueError):
+                list(parquet_files(root, "2023-01-01", "2023-04-01"))
+            old.unlink()
+            self.assertEqual(list(parquet_files(root, "2023-01-01", "2023-04-01")), [new])
 
     def test_outcomes_cannot_change_features(self):
         data = fixture()

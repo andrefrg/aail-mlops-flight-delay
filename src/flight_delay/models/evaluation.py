@@ -41,7 +41,17 @@ def metrics(matrix):
 
 
 def parquet_files(data, start, end):
-    for path in sorted(Path(data).glob("*/month=*/*.parquet")):
+    """Read monthly partitions, accepting legacy folders without mixing layouts."""
+    data = Path(data)
+    monthly = list(data.glob("monthly/month=*/*.parquet"))
+    legacy = [
+        path
+        for folder in ["train", "validation", "test"]
+        for path in data.glob(f"{folder}/month=*/*.parquet")
+    ]
+    if monthly and legacy:
+        raise ValueError("Mixed prepared layouts; run scripts/migrate_prepared_layout.py first")
+    for path in sorted(monthly or legacy):
         month = path.parent.name.split("=", 1)[1]
         if month >= start[:7] and month <= end[:7]:
             yield path

@@ -50,14 +50,6 @@ def priority(row_ids, seed):
         return values ^ (values >> 31)
 
 
-def split_name(date, config):
-    if date < config["validation_start"]:
-        return "train"
-    if date < config["holdout_start"]:
-        return "validation"
-    return "test"
-
-
 def prepare(data_dir, output, config_path, force=False):
     config = json.loads(Path(config_path).read_text())
     if config["features"] != BASE_FEATURES:
@@ -134,16 +126,14 @@ def prepare(data_dir, output, config_path, force=False):
                     counts["invalid_distance_to_missing"] += int(invalid_distance.sum())
                     frame["Distance"] = distance.where(~invalid_distance, np.nan).astype("float32")
                     frame["month"] = dates.loc[frame.index].dt.to_period("M").astype(str)
-                    frame["split"] = frame["FlightDate"].map(lambda date: split_name(date, config))
                     frame["sample_priority"] = priority(frame["row_id"], config["seed"])
                     for month, group in frame.groupby("month", sort=True):
-                        split = group["split"].iloc[0]
-                        target = stage / split / f"month={month}"
+                        target = stage / "monthly" / f"month={month}"
                         target.mkdir(parents=True, exist_ok=True)
                         group.drop(columns="sample_priority").to_parquet(
                             target / f"part-{year}-{block:04d}.parquet", index=False
                         )
-                        monthly[(split, month)] += len(group)
+                        monthly[month] += len(group)
                         counts["prepared"] += len(group)
                         combined = (
                             pd.concat([sample[month], group], ignore_index=True)
@@ -166,7 +156,8 @@ def prepare(data_dir, output, config_path, force=False):
         sampled = sampled.sort_values("row_id").drop(columns="sample_priority")
         sampled.to_parquet(stage / "monthly_sample.parquet", index=False)
         manifest = {
-            "schema_version": 1,
+            "schema_version": 2,
+            "storage_layout": "monthly/month=YYYY-MM/part-*.parquet",
             "preparation_config_sha256": preparation_signature(config),
             "config_sha256": sha256(config_path),
             "sources": sources,
@@ -174,10 +165,7 @@ def prepare(data_dir, output, config_path, force=False):
             "sample_rows": len(sampled),
             "seed": config["seed"],
             "sample_per_month": config["sample_per_month"],
-            "monthly_counts": [
-                {"split": split, "month": month, "rows": n}
-                for (split, month), n in sorted(monthly.items())
-            ],
+            "monthly_counts": [{"month": month, "rows": n} for month, n in sorted(monthly.items())],
             "invalid_duration_examples": invalid_examples,
             "rules": {
                 "eligibility": "Cancelled == 0; Diverted == 0; finite ArrDelay",

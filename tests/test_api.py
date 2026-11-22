@@ -228,7 +228,7 @@ class UnknownCategoriesTests(unittest.TestCase):
             model = joblib.load(TRAINED_MODEL_PATH)
         elif TRAIN_DATA_PATH.is_file():
             sample = pd.read_parquet(TRAIN_DATA_PATH)
-            training = sample.loc[sample["split"].eq("train")]
+            training = sample.loc[sample["FlightDate"].lt("2023-01-01")]
             if training.empty:
                 raise unittest.SkipTest("Prepared training sample has no training rows.")
             config = json.loads(TRAIN_CONFIG_PATH.read_text(encoding="utf-8"))

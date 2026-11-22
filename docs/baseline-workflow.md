@@ -3,8 +3,23 @@
 ## Entradas e preparação
 
 Os CSV originais são ./dataset/flights_2022.csv e flights_2023.csv.
-Os dados derivados ficam em data/processed/, com pastas train (2022), validation
-(jan.–jun. 2023) e test (jul.–dez. 2023), subdivididas por mês.
+Os dados derivados ficam em data/processed/monthly/month=YYYY-MM/.
+Os três folds expansivos e o teste final são definidos por datas em
+configs/baseline.json; os nomes das pastas não determinam os splits.
+A amostra mensal fica em data/processed/monthly_sample.parquet.
+
+Para reorganizar dados preparados antigos, sem recalcular ou alterar os ficheiros:
+
+```bash
+python scripts/migrate_prepared_layout.py --dry-run
+python scripts/migrate_prepared_layout.py
+```
+
+O leitor também aceita as pastas antigas, mas recusa misturar os dois formatos.
+A migração preserva os Parquet, a amostra e o manifesto original. Metadados split
+em ficheiros antigos são históricos e não definem os folds. Novas preparações
+usam schema_version=2 e não gravam split. Alterar o código invalida a reutilização
+automática de modelos antigos; um novo treino local pode exigir --retrain.
 
 Mantêm-se apenas Cancelled == 0, Diverted == 0 e ArrDelay numérico finito.
 As classes são on_time (<15), moderate_delay ([15,60)) e severe_delay (>=60).
