@@ -42,7 +42,9 @@ jobs:
             tests/test_data_audit.py \
             tests/test_baseline.py \
             tests/test_model_contract.py \
-            tests/test_training_workflow.py -v
+            tests/test_training_workflow.py \
+            tests/test_prepared_layout.py \
+            tests/test_model_experiments.py -v
 
       - name: Testar a promoção de modelos
         run: uv run --frozen python -m pytest tests/test_promote_model.py -v

@@ -276,7 +276,7 @@ def write_results(config, selection, evaluated):
         tables / "baseline_cross_validation.csv", index=False
     )
     manifest = json.loads((DATA / "manifest.json").read_text())
-    pd.DataFrame(manifest["monthly_counts"]).to_csv(
+    pd.DataFrame(manifest["monthly_counts"])[["month", "rows"]].to_csv(
         tables / "prepared_monthly_counts.csv", index=False
     )
     cv = pd.read_csv(REPORTS / "cross_validation.csv")

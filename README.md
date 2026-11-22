@@ -25,6 +25,8 @@ ajustes e substitui resultados locais.
 - `configs/feature_policy.csv`: justificação dos 109 campos e oito inputs iniciais.
 - `configs/baseline.json`: preparação, amostra, datas dos folds e C.
 - `reports/tables/temporal_splits.csv`: cortes e contagens por fold.
+- `data/processed/monthly/month=YYYY-MM/`: partições mensais; os folds são filtros por data.
+- `experiments/README.md`: comparação isolada de modelos na validação temporal.
 - `notebooks/01_data_audit.ipynb`: auditoria inicial.
 - `notebooks/02_baseline_results.ipynb`: exploração de treino e resultados.
 - `docs/model-handoff.md`: entrega aos colegas.
