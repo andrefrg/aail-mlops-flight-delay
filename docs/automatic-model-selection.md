@@ -5,7 +5,11 @@
 O critério é explícito em configs/baseline.json: mean_validation_macro_f1.
 Comparam-se as três regressões da aula (C=0.1, 1.0, 10.0), regressão com pesos
 (C=0.1) e uma Random Forest com 60 árvores, profundidade máxima 16, mínimo de
-30 exemplos por folha e duas tarefas paralelas. Uma referência maioritária
+30 exemplos por folha e duas tarefas paralelas. A comparação foi alargada com
+Random Forest (80 árvores, profundidade 24), Extra Trees (80 árvores,
+profundidade 24, class_weight=balanced) e LinearSVC (C=0.1, balanced,
+max_iter=5000). As duas novas florestas mantêm min_samples_leaf=30 e n_jobs=2.
+Há oito candidatos; as features e os folds não mudam. Uma referência maioritária
 acompanha a avaliação mas não pode ser escolhida para promoção.
 
 Os candidatos recebem as mesmas linhas e os mesmos oito inputs em cada um dos
@@ -57,7 +61,7 @@ Abrir http://10.17.0.234:8080 e autenticar com a conta da equipa.
 1. Em Experiments, abrir voos-classification.
 2. Abrir a execução selection-train mais recente. O parâmetro selected_variant
    identifica o vencedor e selection_metric documenta o critério.
-3. Expandir as execuções filhas para ver os cinco candidatos e a referência.
+3. Expandir as execuções filhas para ver os oito candidatos e a referência.
    Cada candidato tem parâmetros, cv_macro_f1_mean/std, outras métricas médias
    e métricas de validação por fold. O tag selected=true identifica o vencedor.
 4. Selecionar os candidatos dessa mesma execução e usar Compare. Ordenar por
@@ -79,7 +83,7 @@ accuracy/macro_f1 na execução principal também representam o teste.
 models/model.joblib continua a conter preparação e classificador juntos; o
 consumidor não precisa de escolher uma classe sklearn nem ajustar encoders.
 model_metadata.json identifica o estimador, candidato e critério. C e max_iter
-ficam vazios quando não se aplicam ao vencedor.
+identificam também o SVM linear; ficam vazios quando não se aplicam ao vencedor.
 
 O treino cria uma versão no Registry. Quando o workflow fornece COMMIT_SHA,
 o alias desse commit aponta para a versão escolhida, tal como antes. Os testes
@@ -90,7 +94,7 @@ entre execuções históricas.
 
 Random Forest usa a mesma serialização skops que o pipeline atual. A lista de
 tipos permitidos inclui o armazenamento interno das árvores sklearn apenas para
-modelos RandomForestClassifier produzidos pelo treino; não se autoriza
+modelos RandomForestClassifier e ExtraTreesClassifier produzidos pelo treino; não se autoriza
 automaticamente qualquer tipo encontrado num ficheiro recebido.
 
 Referências:

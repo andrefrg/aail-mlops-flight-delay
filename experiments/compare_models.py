@@ -14,9 +14,7 @@ import warnings
 
 import joblib
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.exceptions import ConvergenceWarning
-from sklearn.linear_model import LogisticRegression
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -25,31 +23,17 @@ from flight_delay.data.prepare import preparation_signature, priority  # noqa: E
 from flight_delay.models.evaluation import evaluate  # noqa: E402
 from flight_delay.models.pipeline import make_pipeline  # noqa: E402
 
-CANDIDATES = ("majority", "classroom_logistic", "balanced_logistic", "balanced_forest")
-
-
-def build_model(name, seed=42):
-    if name == "majority":
-        return make_pipeline({"name": "majority"}, {})
-    model = make_pipeline({"name": "logistic_C0.1", "C": 0.1}, {})
-    if name == "balanced_logistic":
-        model.set_params(
-            classifier=LogisticRegression(C=0.1, max_iter=200, class_weight="balanced")
-        )
-    elif name == "balanced_forest":
-        model.set_params(
-            classifier=RandomForestClassifier(
-                n_estimators=60,
-                max_depth=16,
-                min_samples_leaf=30,
-                class_weight="balanced_subsample",
-                random_state=seed,
-                n_jobs=2,
-            )
-        )
-    elif name != "classroom_logistic":
-        raise ValueError(f"Unknown candidate: {name}")
-    return model
+def build_model(name, seed=42, variant=None):
+    """Keep the classroom alias while using the shared configured model factory."""
+    if variant is None:
+        config = json.loads((ROOT / "configs/baseline.json").read_text())
+        definitions = {item["name"]: item for item in config["variants"]}
+        definitions["majority"] = {"name": "majority"}
+        definitions["classroom_logistic"] = {"name": "classroom_logistic", "C": 0.1}
+        if name not in definitions:
+            raise ValueError(f"Unknown candidate: {name}")
+        variant = definitions[name]
+    return make_pipeline(variant, {"seed": seed})
 
 
 def development_sample(frame, config, per_month):
@@ -85,6 +69,10 @@ def code_hash():
 def compare(data, output, config, per_month):
     data, output = Path(data), Path(output)
     validate_protocol(config)
+    variants = [{"name": "majority"}, *config["variants"]]
+    names = [item["name"] for item in variants]
+    if len(names) != len(set(names)) or len(names) < 2:
+        raise ValueError("Configure unique candidates, excluding the majority reference")
     manifest = json.loads((data / "manifest.json").read_text())
     if manifest["preparation_config_sha256"] != preparation_signature(config):
         raise ValueError("Prepared data does not match the preparation configuration")
@@ -121,8 +109,9 @@ def compare(data, output, config, per_month):
         training = sample.loc[sample.FlightDate.lt(cutoff)]
         if training.empty:
             raise ValueError("Empty training fold")
-        for name in CANDIDATES:
-            model = build_model(name, config["seed"])
+        for variant in variants:
+            name = variant["name"]
+            model = build_model(name, config["seed"], variant)
             started = time.monotonic()
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter("always", ConvergenceWarning)
@@ -175,7 +164,7 @@ def compare(data, output, config, per_month):
             del model, serialized
     summary = (
         pd.DataFrame(rows)
-        .groupby("model")
+        .groupby("model", sort=False)
         .agg(
             folds=("fold", "count"),
             macro_f1_mean=("macro_f1", "mean"),
@@ -190,7 +179,7 @@ def compare(data, output, config, per_month):
             model_bytes_max=("model_bytes", "max"),
             convergence_warnings=("convergence_warnings", "sum"),
         )
-        .sort_values("macro_f1_mean", ascending=False)
+        .sort_values("macro_f1_mean", ascending=False, kind="stable")
     )
     summary.to_csv(output / "summary.csv")
     winner = summary.drop(index="majority").index[0]

@@ -3,11 +3,12 @@
 import numpy as np
 from sklearn.compose import ColumnTransformer
 from sklearn.dummy import DummyClassifier
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.svm import LinearSVC
 
 from flight_delay.features.build import FlightFeatures, NUMERIC_COLUMNS, categorical_columns
 
@@ -33,13 +34,24 @@ def make_pipeline(variant, config):
         if variant.get("class_weight") is not None:
             parameters["class_weight"] = variant["class_weight"]
         model = LogisticRegression(**parameters)
-    elif estimator == "RandomForestClassifier":
-        model = RandomForestClassifier(
+    elif estimator in ["RandomForestClassifier", "ExtraTreesClassifier"]:
+        forest_class = (
+            RandomForestClassifier if estimator == "RandomForestClassifier" else ExtraTreesClassifier
+        )
+        model = forest_class(
             n_estimators=variant.get("n_estimators", 60),
             max_depth=variant.get("max_depth", 16),
             min_samples_leaf=variant.get("min_samples_leaf", 30),
             class_weight=variant.get("class_weight", "balanced_subsample"),
             n_jobs=variant.get("n_jobs", 2),
+            random_state=config.get("seed", 42),
+        )
+    elif estimator == "LinearSVC":
+        model = LinearSVC(
+            C=variant.get("C", 0.1),
+            class_weight=variant.get("class_weight", "balanced"),
+            dual="auto",
+            max_iter=variant.get("max_iter", 5000),
             random_state=config.get("seed", 42),
         )
     else:

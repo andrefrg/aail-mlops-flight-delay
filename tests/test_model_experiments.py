@@ -7,6 +7,8 @@ import sys
 import tempfile
 import unittest
 
+import joblib
+import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
@@ -15,6 +17,7 @@ sys.path[:0] = [str(ROOT / "src"), str(ROOT / "tests")]
 from experiments.compare_models import build_model, compare, development_sample, validate_protocol
 from flight_delay.data.audit import BASE_FEATURES
 from flight_delay.data.prepare import prepare
+from flight_delay.models.pipeline import make_pipeline
 from test_baseline import fixture
 
 
@@ -39,13 +42,46 @@ class ExperimentTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_protocol(config)
 
+    def test_custom_candidate_parameters_are_used(self):
+        for estimator in ["RandomForestClassifier", "ExtraTreesClassifier"]:
+            variant = {"name": "custom", "estimator": estimator, "n_estimators": 3,
+                       "max_depth": 4, "min_samples_leaf": 2, "n_jobs": 1}
+            model = build_model("custom", seed=17, variant=variant)[-1]
+            self.assertEqual(model.n_estimators, 3)
+            self.assertEqual(model.max_depth, 4)
+            self.assertEqual(model.random_state, 17)
+
+    def test_new_estimators_support_skops_roundtrip(self):
+        import skops.io as sio
+
+        frame = fixture()
+        for estimator in ["ExtraTreesClassifier", "LinearSVC"]:
+            with self.subTest(estimator=estimator):
+                variant = {"name": "new", "estimator": estimator, "n_estimators": 3,
+                           "min_samples_leaf": 1, "n_jobs": 1}
+                model = make_pipeline(variant, {"seed": 42}).fit(frame[BASE_FEATURES], frame.target)
+                saved = sio.dumps(model)
+                trusted = ["flight_delay.features.build.FlightFeatures", "numpy.dtype"]
+                if estimator == "ExtraTreesClassifier":
+                    trusted.append("sklearn.tree._tree.Tree")
+                restored = sio.loads(saved, trusted=trusted)
+                np.testing.assert_array_equal(
+                    restored.predict(frame[BASE_FEATURES]), model.predict(frame[BASE_FEATURES])
+                )
+
     def test_candidates_accept_unknown_categories(self):
         frame = fixture()
         future = frame[BASE_FEATURES].iloc[:2].copy()
         future["Origin"] = "UNKNOWN"
-        for name in ["classroom_logistic", "balanced_logistic", "balanced_forest"]:
-            model = build_model(name).fit(frame[BASE_FEATURES], frame.target)
-            self.assertEqual(len(model.predict(future)), 2)
+        for variant in self.config()["variants"]:
+            with self.subTest(candidate=variant["name"]):
+                model = build_model(variant["name"]).fit(frame[BASE_FEATURES], frame.target)
+                predicted = model.predict(future)
+                self.assertEqual(len(predicted), 2)
+                with tempfile.TemporaryDirectory() as tmp:
+                    path = Path(tmp) / "model.joblib"
+                    joblib.dump(model, path)
+                    np.testing.assert_array_equal(joblib.load(path).predict(future), predicted)
         self.assertEqual(
             build_model("classroom_logistic")[-1].get_params(),
             LogisticRegression(C=0.1, max_iter=200).get_params(),
@@ -76,10 +112,10 @@ class ExperimentTests(unittest.TestCase):
             summary = compare(data, root / "results", config, 100)
             self.assertEqual(
                 set(summary.index),
-                {"majority", "classroom_logistic", "balanced_logistic", "balanced_forest"},
+                {"majority", *[v["name"] for v in config["variants"]]},
             )
             scores = pd.read_csv(root / "results/fold_metrics.csv")
-            self.assertEqual(scores.validation_rows.tolist(), [12] * 4)
+            self.assertEqual(scores.validation_rows.tolist(), [12] * (1 + len(config["variants"])))
             self.assertEqual(scores.train_rows.nunique(), 1)
             self.assertFalse(
                 json.loads((root / "results/selection.json").read_text())["final_test_evaluated"]
