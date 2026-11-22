@@ -10,6 +10,8 @@ from unittest.mock import Mock, patch
 import joblib
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from flight_delay.models.tracking import tracking_metrics
 
 from flight_delay.data.prepare import prepare
 from flight_delay.models import training
@@ -97,6 +99,106 @@ class WorkflowTests(unittest.TestCase):
             self.assertNotIn("registry", metadata)
             self.assertEqual(results["baseline"]["rows"], 6)
             self.assertTrue((root / "reports/tables/temporal_splits.csv").exists())
+
+
+class AutomaticSelectionTests(unittest.TestCase):
+    def test_macro_f1_selects_different_candidate_than_accuracy(self):
+        rows = pd.DataFrame(
+            [
+                {"model": "majority", "accuracy": 0.99, "macro_f1": 0.99},
+                {"model": "linear", "accuracy": 0.8, "macro_f1": 0.3, "test_macro_f1": 0.99},
+                {"model": "forest", "accuracy": 0.5, "macro_f1": 0.4, "test_macro_f1": 0.1},
+            ]
+        )
+        variants = [{"name": "linear"}, {"name": "forest"}]
+        selected, _ = training.choose_variant(rows, variants, metric="macro_f1")
+        self.assertEqual(selected["name"], "forest")
+        rows.loc[rows.model.eq("linear"), "macro_f1"] = 0.4
+        selected, _ = training.choose_variant(rows, variants, metric="macro_f1")
+        self.assertEqual(selected["name"], "linear")
+
+    def test_incomplete_or_nonfinite_scores_are_rejected(self):
+        variants = [{"name": "linear"}, {"name": "forest"}]
+        rows = pd.DataFrame(
+            [
+                {"model": "linear", "fold": "one", "macro_f1": 0.4},
+                {"model": "linear", "fold": "two", "macro_f1": 0.5},
+                {"model": "forest", "fold": "one", "macro_f1": 0.6},
+            ]
+        )
+        with self.assertRaises(ValueError):
+            training.choose_variant(rows, variants, "macro_f1", expected_folds=2)
+        rows.loc[0, "macro_f1"] = float("nan")
+        with self.assertRaises(ValueError):
+            training.choose_variant(rows, variants, "macro_f1")
+
+    def test_random_forest_winner_is_exported_and_evaluated(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / "raw"
+            raw.mkdir()
+            for year in [2022, 2023]:
+                frame = fixture(year)
+                if year == 2023:
+                    frame.loc[12:, "FlightDate"] = [f"2023-07-{day:02d}" for day in range(1, 7)]
+                frame.to_csv(raw / f"flights_{year}.csv", index=False)
+            config = json.loads(
+                (Path(__file__).resolve().parents[1] / "configs/baseline.json").read_text()
+            )
+            config.update(sample_per_month=100, chunksize=7)
+            config["folds"] = [
+                {
+                    "name": "validation",
+                    "validation_start": "2023-01-01",
+                    "validation_end": "2023-07-01",
+                }
+            ]
+            config["variants"] = [
+                {
+                    "name": "forest",
+                    "estimator": "RandomForestClassifier",
+                    "n_estimators": 5,
+                    "min_samples_leaf": 1,
+                    "n_jobs": 1,
+                }
+            ]
+            settings = root / "config.json"
+            settings.write_text(json.dumps(config))
+            data = root / "data/processed"
+            prepare(raw, data, settings)
+            reports = root / "reports/generated/baseline"
+            with patch.multiple(
+                training, ROOT=root, DATA=data, MODELS=root / "models", REPORTS=reports
+            ):
+                with patch.object(training, "code_fingerprint", return_value="test-code"):
+                    with patch.object(training, "evaluate", wraps=training.evaluate) as evaluate:
+                        selection = training.train(settings)
+                        for call in evaluate.call_args_list:
+                            self.assertLessEqual(call.args[3], config["holdout_start"])
+                    results = training.evaluate_model(settings)
+            model = joblib.load(root / "models/model.joblib")
+            self.assertIsInstance(model[-1], RandomForestClassifier)
+            self.assertEqual(selection["estimator"], "RandomForestClassifier")
+            meta = json.loads((root / "models/model_metadata.json").read_text())
+            self.assertIsNone(meta["C"])
+            logged = tracking_metrics(reports, selection, results["baseline"])
+            self.assertIn("cv_macro_f1_mean", logged)
+            self.assertEqual(logged["test_macro_f1"], results["baseline"]["macro_f1"])
+            self.assertTrue((reports / "validation_details.json").is_file())
+
+    def test_tracking_keeps_validation_and_test_metrics_separate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            reports = Path(directory)
+            pd.DataFrame(
+                [
+                    {"model": "forest", "accuracy": 0.5, "macro_f1": 0.4},
+                    {"model": "forest", "accuracy": 0.7, "macro_f1": 0.6},
+                ]
+            ).to_csv(reports / "cross_validation.csv", index=False)
+            metrics = tracking_metrics(reports, {"variant": {"name": "forest"}})
+            self.assertAlmostEqual(metrics["cv_macro_f1_mean"], 0.5)
+            self.assertAlmostEqual(metrics["cv_macro_f1_std"], 0.1)
+            self.assertNotIn("test_macro_f1", metrics)
 
 
 if __name__ == "__main__":

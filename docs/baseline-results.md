@@ -1,49 +1,31 @@
-# Parte 1 — resultados do baseline
+# Seleção automática — resultados
 
-## Modelo e dados
+Candidato selecionado: balanced_forest (RandomForestClassifier).
+Critério: mean_validation_macro_f1; média aritmética dos folds, empate pela
+ordem da configuração. A referência maioritária não é candidata à promoção.
 
-Estimador da aula: LogisticRegression(max_iter=200, C=C), C em [0.1, 1.0, 10.0].
-C escolhido pela accuracy média em três folds temporais: 0.1.
-Os outros parâmetros do estimador são os valores por omissão da biblioteca.
+Preparados 13,275,415 voos elegíveis; treino com até
+30,000 por mês. Seleção pelos folds de desenvolvimento;
+o teste final não escolhe o modelo. Pré-processamento ajustado só no treino.
 
-Preparados 13,275,415 voos elegíveis. Durações previstas
-inválidas convertidas em ausência: 5.
-Treino com até 30,000 voos por mês; validação e teste usam
-todos os voos preparados dos respetivos períodos. Os oito inputs pré-partida
-são selecionados explicitamente. A imputação, escala e encoding são aprendidos
-só no treino de cada fold. Há 7 dias de intervalo antes da avaliação.
+O vencedor foi ajustado em 533,267 exemplos anteriores
+a 2023-06-24 (exclusivo), sem refit posterior no teste.
 
-O modelo final foi ajustado em 533,267 voos anteriores
-a 2023-06-24 (exclusivo), com 115
-iterações e 0 avisos de convergência.
-Não foi reajustado no período de teste.
+## Avaliação no teste histórico
 
-## Teste: julho a dezembro de 2023
-
+- Período: 2023-07-01 até 2024-01-01 (exclusivo).
 - Voos: 3,463,444.
-- Accuracy: 0.809781; referência maioritária: 0.809812.
-- Macro-F1: 0.298480; referência: 0.298304.
-- Recall severe_delay: 0.003664%.
+- Accuracy: 0.522962; maioria: 0.809812.
+- Macro-F1: 0.364194; maioria: 0.298304.
+- Recall severo: 48.4635%.
+- Precision severa: 10.9683%.
 
-O modelo prevê quase sempre on_time e praticamente não deteta a classe severa.
-A accuracy elevada reflete sobretudo o desbalanceamento. Não se demonstrou
-utilidade operacional. O teste já tinha sido observado em experiências anteriores;
-C foi selecionado apenas nas janelas de validação. Não se afirma que seja um teste
-novo nunca inspecionado. Não existem timestamps de publicação dos rótulos BTS:
-a avaliação é cronológica retrospetiva, sem simular esse calendário.
+O teste já foi observado em experiências anteriores: não é um novo teste nunca
+visto. Não existem timestamps de publicação dos rótulos BTS; a avaliação é
+cronológica retrospetiva. Maior macro-F1 não garante utilidade operacional.
 
-## Entrega aos colegas
-
-- models/model.joblib: pipeline completo, nome base model.
-- models/model_metadata.json: esquema, classes, parâmetros, hashes e proveniência.
-- reports/tables/: tabelas pequenas para o relatório.
-- reports/generated/baseline/: avaliação por classe, matriz de confusão e subgrupos.
-- docs/model-handoff.md: interface e comandos propostos para a equipa.
-
-Resultados produzidos pela execução de preparação, treino e avaliação desta versão.
-
-Esta parte inclui um Dockerfile de treino, mas não implementa servidor HTTP, Docker de serviço, workflows GitHub Actions,
-autenticação, VMs, registry ou publicação. Essas responsabilidades pertencem aos
-colegas 2, 3 e 4. Os resultados locais estão prontos para o colega 2 registar no
-sistema de tracking da equipa. Os comandos de treino/inferência são uma proposta
-a acordar em conjunto; não são apresentados como decisão já aprovada pelo grupo.
+O pipeline completo está em models/model.joblib. A configuração e os resultados
+por fold permitem auditar a escolha. A publicação no MLflow identifica os
+candidatos, o critério e a versão vencedora; staging/production seguem a pipeline
+de testes existente. Não se compara automaticamente com execuções históricas
+que usem outros dados ou protocolos de validação.

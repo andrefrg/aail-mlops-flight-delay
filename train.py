@@ -2,13 +2,10 @@
 
 import argparse
 from contextlib import nullcontext
-import csv
 import json
-import math
 import os
 from pathlib import Path
 import re
-from statistics import mean, pstdev
 import sys
 
 import joblib
@@ -19,6 +16,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from flight_delay.data.prepare import prepare
 from flight_delay.data.audit import sha256
 from flight_delay.models.training import train, evaluate_model
+from flight_delay.models.tracking import log_candidate_runs, tracking_metrics as validation_metrics
 
 
 def recorded_evaluation(config_path):
@@ -37,29 +35,7 @@ def recorded_evaluation(config_path):
 
 
 def tracking_metrics(selection, result=None):
-    """Separate selected-variant validation scores from final-test metrics."""
-    with (ROOT / "reports/generated/baseline/cross_validation.csv").open(newline="") as stream:
-        scores = [
-            float(row["accuracy"])
-            for row in csv.DictReader(stream)
-            if row["model"] == selection["variant"]["name"]
-        ]
-    if not scores or not all(math.isfinite(score) for score in scores):
-        raise ValueError("Missing or invalid validation accuracies for the selected model")
-    metrics = {
-        "cv_accuracy_mean": mean(scores),
-        "cv_accuracy_std": pstdev(scores),
-    }
-    if result is not None:
-        metrics.update({
-            "accuracy": result["accuracy"],
-            "macro_f1": result["macro_f1"],
-            "balanced_accuracy": result["balanced_accuracy"],
-            "recall_severe_delay": result["classes"]["severe_delay"]["recall"],
-            "recall_moderate_delay": result["classes"]["moderate_delay"]["recall"],
-            "precision_severe_delay": result["classes"]["severe_delay"]["precision"],
-        })
-    return metrics
+    return validation_metrics(ROOT / "reports/generated/baseline", selection, result)
 
 
 def register_model(mlflow, model_uri, model_name, commit_sha=None):
@@ -105,31 +81,97 @@ def main():
         import mlflow.sklearn
 
         mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "http://10.17.0.234:8080"))
-        mlflow.set_experiment(os.environ.get("MLFLOW_EXPERIMENT_NAME", "voo-classification"))
+        mlflow.set_experiment(os.environ.get("MLFLOW_EXPERIMENT_NAME", "voos-classification"))
 
-    with mlflow.start_run() if mlflow is not None else nullcontext():
+    config = json.loads(args.config.read_text())
+    reused = (ROOT / "models/selection.json").exists() and not args.retrain
+    execution_type = (
+        "register_existing"
+        if args.phase == "register"
+        else "evaluate_existing"
+        if args.phase == "evaluate"
+        else "reuse_existing"
+        if reused
+        else "train"
+    )
+    with (
+        mlflow.start_run(run_name=f"selection-{execution_type}")
+        if mlflow is not None
+        else nullcontext()
+    ):
+        if mlflow is not None:
+            mlflow.log_params(
+                {
+                    "selection_metric": config.get("selection_metric", "mean_validation_accuracy"),
+                    "candidate_count": len(config["variants"]),
+                    "gap_days": config["gap_days"],
+                    "sample_per_month": config["sample_per_month"],
+                }
+            )
+            mlflow.set_tags({"role": "selection", "execution_type": execution_type})
         if args.phase == "register":
             selection, result = recorded_evaluation(args.config)
             print("Registering the saved model and recorded evaluation; no retraining.", flush=True)
             if mlflow is not None:
-                mlflow.set_tags({
-                    "execution_type": "register_existing",
-                    "trained_code_sha256": selection["execution_context"]["code_sha256"],
-                })
+                mlflow.set_tags(
+                    {
+                        "execution_type": "register_existing",
+                        "trained_code_sha256": selection["execution_context"]["code_sha256"],
+                    }
+                )
         elif args.phase in ["all", "train"]:
             selection = train(args.config, retrain=args.retrain)
         else:
             selection = json.loads((ROOT / "models/selection.json").read_text())
         if mlflow is not None:
-            mlflow.log_params({"estimator": selection["estimator"], "C": selection["variant"]["C"]})
+            mlflow.log_params(
+                {
+                    "estimator": selection["estimator"],
+                    "selected_variant": selection["variant"]["name"],
+                    "selection_metric": selection["selection_metric"],
+                    **{
+                        key: value
+                        for key, value in selection["variant"].items()
+                        if key not in ["name", "estimator"] and value is not None
+                    },
+                }
+            )
+            mlflow.set_tags(
+                {
+                    "execution_type": execution_type,
+                    "role": "selection",
+                    "data_manifest_sha256": selection["provenance"]["data_manifest_sha256"],
+                    "config_sha256": selection["provenance"]["config_sha256"],
+                    "trained_git_commit": selection["provenance"]["git_commit"],
+                    "trained_git_dirty": str(selection["provenance"]["git_dirty"]).lower(),
+                }
+            )
         if args.phase in ["all", "evaluate"]:
             evaluated = evaluate_model(args.config)
             result = evaluated["baseline"]
-            print(f"model.joblib: accuracy={result['accuracy']:.6f}; macro-F1={result['macro_f1']:.6f}")
+            print(
+                f"model.joblib: accuracy={result['accuracy']:.6f}; macro-F1={result['macro_f1']:.6f}"
+            )
         if mlflow is not None:
-            mlflow.log_metrics(tracking_metrics(
-                selection, result if args.phase in ["all", "evaluate", "register"] else None
-            ))
+            mlflow.log_metrics(
+                tracking_metrics(
+                    selection, result if args.phase in ["all", "evaluate", "register"] else None
+                )
+            )
+            reports = ROOT / "reports/generated/baseline"
+            log_candidate_runs(mlflow, reports, config, selection, execution_type)
+            for path in [
+                args.config,
+                ROOT / "models/selection.json",
+                ROOT / "models/model_metadata.json",
+                ROOT / "data/processed/manifest.json",
+                reports / "cross_validation.csv",
+                reports / "validation_details.json",
+                reports / "holdout.json",
+                reports / "holdout_subgroups.csv",
+            ]:
+                if path.exists():
+                    mlflow.log_artifact(str(path), artifact_path="selection")
             model_info = mlflow.sklearn.log_model(
                 sk_model=joblib.load(ROOT / "models/model.joblib"),
                 name="model",
@@ -137,12 +179,28 @@ def main():
                 skops_trusted_types=[
                     "flight_delay.features.build.FlightFeatures",
                     "numpy.dtype",
+                    *(
+                        ["sklearn.tree._tree.Tree"]
+                        if selection["estimator"] == "RandomForestClassifier"
+                        else []
+                    ),
                 ],
                 code_paths=[str(ROOT / "src/flight_delay")],
             )
             model_name = os.environ.get("MLFLOW_MODEL_NAME", "voos-model")
             version = register_model(
                 mlflow, model_info.model_uri, model_name, os.environ.get("COMMIT_SHA")
+            )
+            client = mlflow.MlflowClient()
+            for key, value in {
+                "selected_variant": selection["variant"]["name"],
+                "selection_metric": selection["selection_metric"],
+                "data_manifest_sha256": selection["provenance"]["data_manifest_sha256"],
+            }.items():
+                client.set_model_version_tag(model_name, version.version, key, value)
+            print(
+                f"Selected: {selection['variant']['name']} ({selection['selection_metric']})",
+                flush=True,
             )
             print(f"MLflow run: {mlflow.active_run().info.run_id}", flush=True)
             print(f"MLflow model: {model_info.model_uri}", flush=True)

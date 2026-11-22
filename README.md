@@ -8,8 +8,10 @@ Esta contribuição cobre apenas:
 4. Folds cronológicos e baseline da aula.
 5. Avaliação e entrega do pipeline guardado como model.
 
-O classificador é `LogisticRegression(max_iter=200, C=C)`, com C em
-`[0.1, 1.0, 10.0]`. O pipeline inclui as transformações dos dados de voos.
+O treino compara cinco candidatos nos mesmos três folds temporais: regressão da
+aula com C em [0.1, 1.0, 10.0], regressão com pesos e Random Forest. Seleciona
+pelo maior macro-F1 médio de validação e ajusta o vencedor para entrega. O teste
+final não participa na escolha. O pipeline inclui as transformações dos voos.
 
 Comandos propostos para acordar com o grupo, a partir da raiz:
 
@@ -30,10 +32,13 @@ ajustes e substitui resultados locais.
 - `notebooks/01_data_audit.ipynb`: auditoria inicial.
 - `notebooks/02_baseline_results.ipynb`: exploração de treino e resultados.
 - `docs/model-handoff.md`: entrega aos colegas.
+- `docs/automatic-model-selection.md`: regra de seleção, comandos e consulta no MLflow.
 - `docs/baseline-results.md`: métricas e limitações reais.
 
-O `train.py` regista `estimator`, `C` e métricas de teste e validação cruzada no MLflow, na experiência
-`voo-classification`, e publica o pipeline no Registry como `voos-model`.
+O train.py regista uma execução principal de seleção e uma execução filha por
+candidato no MLflow, na experiência voos-classification. Só o vencedor é
+registado no Registry como voos-model. Parâmetros, métricas de validação/teste e
+artefactos da comparação ficam disponíveis para consulta.
 Configuração e comandos: [docs/README_mlflow.md](docs/README_mlflow.md).
 Para executar apenas localmente, usa `python train.py --no-tracking`.
 Os CSV originais ficam fora do Git. Por defeito, o treino local lê os ficheiros

@@ -51,20 +51,22 @@ O CSV reports/tables/temporal_splits.csv inclui as contagens efetivas.
 São decisões implementadas nesta proposta; os comandos e protocolo de integração
 continuam a precisar de acordo do grupo.
 
-## Modelo da aula
+## Candidatos e seleção automática
 
-O material fornecido usa:
+O baseline da aula mantém-se como referência: LogisticRegression(max_iter=200,
+C=C), com C em [0.1, 1.0, 10.0]. A configuração inclui também regressão com
+class_weight=balanced e RandomForestClassifier com limites de tamanho.
 
-```python
-for C in [0.1, 1.0, 10.0]:
-    model = LogisticRegression(max_iter=200, C=C)
-```
+Todos recebem os mesmos inputs e exemplos de treino em cada fold. A escolha usa
+mean_validation_macro_f1, a média aritmética entre os três períodos. Empates
+seguem a ordem dos candidatos na configuração; a referência maioritária não
+participa na seleção. A opção histórica mean_validation_accuracy continua
+suportada. Não se consulta o teste final para decidir o vencedor.
 
-É esse o estimador da implementação. Não se usa SGD, class_weight balanced ou
-rota no classificador. Adaptaram-se os inputs Iris para voos e a divisão aleatória
-para os folds temporais do projeto. C é escolhido pela accuracy média na validação,
-como métrica da aula; macro-F1, matriz de confusão e métricas por classe/subgrupo
-são complementares. O teste não escolhe C.
+O vencedor é ajustado antes do teste, guardado como pipeline completo e registado
+no MLflow. Este mecanismo escolhe entre os candidatos da execução, não entre
+modelos históricos avaliados com dados ou protocolos diferentes. Detalhes em
+automatic-model-selection.md.
 
 O treino usa até 30 000 voos por mês, amostrados por prioridade determinística
 independente do alvo. Validação e teste usam todos os voos preparados dos seus
@@ -86,7 +88,8 @@ python -m unittest discover -s tests -v
 --data-dir permite outra pasta de dados. --phase prepare, --phase train e
 --phase evaluate permitem executar etapas separadas. --force-prepare reconstrói
 os derivados. --retrain repete o treino e substitui os artefactos e resultados
-locais; não cria backups nem faz publicação. Sem esse argumento reutiliza-se o
+locais; não cria backups. O registo MLflow está ativo por omissão; --no-tracking
+desativa o registo. Sem --retrain reutiliza-se o
 modelo existente quando coincide com o contexto registado.
 
 O pipeline completo é models/model.joblib. O teste é feito nesse mesmo modelo;
