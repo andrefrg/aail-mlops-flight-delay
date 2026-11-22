@@ -61,10 +61,16 @@ def load_config(config_path):
     config = json.loads(Path(config_path).read_text())
     if config["features"] != BASE_FEATURES:
         raise ValueError("Feature configuration does not match the implemented allowlist")
-    if config["model"] != {"estimator": "LogisticRegression", "max_iter": 200} or [
-        v["C"] for v in config["variants"]
-    ] != [0.1, 1.0, 10.0]:
-        raise ValueError("Keep the classroom estimator and C grid")
+    if config.get("selection_metric", "mean_validation_accuracy") not in [
+        "mean_validation_accuracy",
+        "mean_validation_macro_f1",
+    ]:
+        raise ValueError("Unsupported selection metric")
+    names = [variant["name"] for variant in config["variants"]]
+    if not names or len(names) != len(set(names)) or "majority" in names:
+        raise ValueError("Candidate names must be unique and exclude the majority reference")
+    for variant in config["variants"]:
+        make_pipeline(variant, config)
     manifest = json.loads((DATA / "manifest.json").read_text())
     expected = (
         preparation_signature(config)
@@ -85,13 +91,15 @@ def fit(model, frame):
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always", ConvergenceWarning)
         model.fit(frame[BASE_FEATURES], frame["target"].astype(str))
+    iterations = getattr(model[-1], "n_iter_", None)
     return {
         "train_rows": len(frame),
         "fit_seconds": round(time.monotonic() - started, 3),
         "convergence_warnings": [
             str(item.message) for item in caught if issubclass(item.category, ConvergenceWarning)
         ],
-        "iterations": int(np.max(np.atleast_1d(getattr(model[-1], "n_iter_", 0)))),
+        "iterations": int(np.max(np.atleast_1d(iterations))) if iterations is not None else None,
+        "trees": getattr(model[-1], "n_estimators", None),
     }
 
 
@@ -100,9 +108,20 @@ def before(frame, cutoff, gap_days):
     return frame.loc[frame["FlightDate"].lt(end)].copy(), end
 
 
-def choose_variant(results, variants):
-    table = results.loc[results["model"].ne("majority")]
-    means = table.groupby("model")["accuracy"].mean().sort_values(ascending=False, kind="stable")
+def choose_variant(results, variants, metric="accuracy", expected_folds=None):
+    """Select by mean development score; exact ties follow configuration order."""
+    if metric not in ["accuracy", "macro_f1"]:
+        raise ValueError("Unsupported selection metric")
+    names = [item["name"] for item in variants]
+    table = results.loc[results["model"].isin(names)]
+    if set(table["model"]) != set(names) or not np.isfinite(table[metric]).all():
+        raise ValueError("Missing or nonfinite candidate validation scores")
+    if expected_folds is not None:
+        counts = table.groupby("model")["fold"].nunique()
+        if not counts.eq(expected_folds).all() or table.duplicated(["model", "fold"]).any():
+            raise ValueError("Every candidate must have one result for every fold")
+    means = table.groupby("model")[metric].mean().reindex(names)
+    means = means.sort_values(ascending=False, kind="stable")
     selected = next(item for item in variants if item["name"] == means.index[0])
     return selected, means.to_dict()
 
@@ -142,6 +161,7 @@ def train(config_path, retrain=False):
     REPORTS.mkdir(parents=True, exist_ok=True)
     MODELS.mkdir(exist_ok=True)
     result_rows = []
+    validation_details = {}
     origin = provenance(config_path)
     for fold in config["folds"]:
         training, train_end = before(sample, fold["validation_start"], config["gap_days"])
@@ -154,6 +174,11 @@ def train(config_path, retrain=False):
             information[name] = fit(models[name], training)
             print(f"Fit {fold['name']} / {name}: {len(training):,} sampled rows", flush=True)
         evaluated, _ = evaluate(models, DATA, fold["validation_start"], fold["validation_end"])
+        validation_details[fold["name"]] = {
+            "train_end_exclusive": train_end,
+            "train_rows_sha256": hashlib.sha256(training.row_id.to_numpy().tobytes()).hexdigest(),
+            "models": evaluated,
+        }
         for variant in variants:
             name = variant["name"]
             result = evaluated[name]
@@ -168,6 +193,9 @@ def train(config_path, retrain=False):
                     "validation_rows": result["rows"],
                     "accuracy": result["accuracy"],
                     "macro_f1": result["macro_f1"],
+                    "balanced_accuracy": result["balanced_accuracy"],
+                    "moderate_recall": result["classes"]["moderate_delay"]["recall"],
+                    "severe_precision": result["classes"]["severe_delay"]["precision"],
                     "severe_recall": result["classes"]["severe_delay"]["recall"],
                     **information[name],
                 }
@@ -177,7 +205,10 @@ def train(config_path, retrain=False):
                 flush=True,
             )
     results = pd.DataFrame(result_rows)
-    variant, scores = choose_variant(results, config["variants"])
+    selection_metric = config.get("selection_metric", "mean_validation_accuracy")
+    metric = selection_metric.removeprefix("mean_validation_")
+    variant, scores = choose_variant(results, config["variants"], metric, len(config["folds"]))
+    write_json(REPORTS / "validation_details.json", validation_details)
     training, cutoff = before(sample, config["holdout_start"], config["gap_days"])
     model = make_pipeline(variant, config)
     fit_info = fit(model, training)
@@ -188,8 +219,8 @@ def train(config_path, retrain=False):
     results.to_csv(REPORTS / "cross_validation.csv", index=False)
     selection = {
         "variant": variant,
-        "estimator": "LogisticRegression",
-        "selection_metric": "mean_validation_accuracy",
+        "estimator": type(model[-1]).__name__,
+        "selection_metric": selection_metric,
         "selection_scores": scores,
         "fit": fit_info,
         "train_end_exclusive": cutoff,
@@ -198,7 +229,10 @@ def train(config_path, retrain=False):
         "model_sha256": sha256(MODELS / "model.joblib"),
     }
     write_json(selection_path, selection)
-    print(f"Selected C={variant['C']}; exported models/model.joblib", flush=True)
+    print(
+        f"Selected {variant['name']} by {selection_metric}; exported models/model.joblib",
+        flush=True,
+    )
     return selection
 
 
@@ -239,9 +273,11 @@ def evaluate_model(config_path):
         "name": "model",
         "file": "model.joblib",
         "format": "joblib",
-        "estimator": "LogisticRegression",
-        "C": selection["variant"]["C"],
-        "max_iter": 200,
+        "estimator": selection["estimator"],
+        "variant": selection["variant"],
+        "selection_metric": selection["selection_metric"],
+        "C": selection["variant"].get("C"),
+        "max_iter": 200 if selection["estimator"] == "LogisticRegression" else None,
         "fit": selection["fit"],
         "trained_before_exclusive": selection["train_end_exclusive"],
         "raw_features": BASE_FEATURES,
@@ -310,60 +346,37 @@ def write_results(config, selection, evaluated):
     )
     pd.DataFrame(splits).to_csv(tables / "temporal_splits.csv", index=False)
     result = evaluated["baseline"]
-    reused = (
-        "A limpeza de escopo reutilizou os pesos e métricas já verificados, sem retreino. Os bytes do modelo e os módulos de preparação/features/estimador/avaliação foram preservados. A proveniência original e o novo contexto de execução são identificados separadamente."
-        if selection.get("scope_cleanup")
-        else "Resultados produzidos pela execução de preparação, treino e avaliação desta versão."
-    )
-    text = f"""# Parte 1 — resultados do baseline
+    text = f"""# Seleção automática — resultados
 
-## Modelo e dados
+Candidato selecionado: {selection["variant"]["name"]} ({selection["estimator"]}).
+Critério: {selection["selection_metric"]}; média aritmética dos folds, empate pela
+ordem da configuração. A referência maioritária não é candidata à promoção.
 
-Estimador da aula: LogisticRegression(max_iter=200, C=C), C em [0.1, 1.0, 10.0].
-C escolhido pela accuracy média em três folds temporais: {selection["variant"]["C"]}.
-Os outros parâmetros do estimador são os valores por omissão da biblioteca.
+Preparados {manifest["counts"]["prepared"]:,} voos elegíveis; treino com até
+{config["sample_per_month"]:,} por mês. Seleção pelos folds de desenvolvimento;
+o teste final não escolhe o modelo. Pré-processamento ajustado só no treino.
 
-Preparados {manifest["counts"]["prepared"]:,} voos elegíveis. Durações previstas
-inválidas convertidas em ausência: {manifest["counts"]["invalid_duration_to_missing"]}.
-Treino com até {config["sample_per_month"]:,} voos por mês; validação e teste usam
-todos os voos preparados dos respetivos períodos. Os oito inputs pré-partida
-são selecionados explicitamente. A imputação, escala e encoding são aprendidos
-só no treino de cada fold. Há {config["gap_days"]} dias de intervalo antes da avaliação.
+O vencedor foi ajustado em {selection["fit"]["train_rows"]:,} exemplos anteriores
+a {selection["train_end_exclusive"]} (exclusivo), sem refit posterior no teste.
 
-O modelo final foi ajustado em {selection["fit"]["train_rows"]:,} voos anteriores
-a {selection["train_end_exclusive"]} (exclusivo), com {selection["fit"]["iterations"]}
-iterações e {len(selection["fit"]["convergence_warnings"])} avisos de convergência.
-Não foi reajustado no período de teste.
+## Avaliação no teste histórico
 
-## Teste: julho a dezembro de 2023
-
+- Período: {config["holdout_start"]} até {config["end_exclusive"]} (exclusivo).
 - Voos: {result["rows"]:,}.
-- Accuracy: {result["accuracy"]:.6f}; referência maioritária: {evaluated["majority"]["accuracy"]:.6f}.
-- Macro-F1: {result["macro_f1"]:.6f}; referência: {evaluated["majority"]["macro_f1"]:.6f}.
-- Recall severe_delay: {100 * result["classes"]["severe_delay"]["recall"]:.6f}%.
+- Accuracy: {result["accuracy"]:.6f}; maioria: {evaluated["majority"]["accuracy"]:.6f}.
+- Macro-F1: {result["macro_f1"]:.6f}; maioria: {evaluated["majority"]["macro_f1"]:.6f}.
+- Recall severo: {100 * result["classes"]["severe_delay"]["recall"]:.4f}%.
+- Precision severa: {100 * result["classes"]["severe_delay"]["precision"]:.4f}%.
 
-O modelo prevê quase sempre on_time e praticamente não deteta a classe severa.
-A accuracy elevada reflete sobretudo o desbalanceamento. Não se demonstrou
-utilidade operacional. O teste já tinha sido observado em experiências anteriores;
-C foi selecionado apenas nas janelas de validação. Não se afirma que seja um teste
-novo nunca inspecionado. Não existem timestamps de publicação dos rótulos BTS:
-a avaliação é cronológica retrospetiva, sem simular esse calendário.
+O teste já foi observado em experiências anteriores: não é um novo teste nunca
+visto. Não existem timestamps de publicação dos rótulos BTS; a avaliação é
+cronológica retrospetiva. Maior macro-F1 não garante utilidade operacional.
 
-## Entrega aos colegas
-
-- models/model.joblib: pipeline completo, nome base model.
-- models/model_metadata.json: esquema, classes, parâmetros, hashes e proveniência.
-- reports/tables/: tabelas pequenas para o relatório.
-- reports/generated/baseline/: avaliação por classe, matriz de confusão e subgrupos.
-- docs/model-handoff.md: interface e comandos propostos para a equipa.
-
-{reused}
-
-Esta parte inclui um Dockerfile de treino, mas não implementa servidor HTTP, Docker de serviço, workflows GitHub Actions,
-autenticação, VMs, registry ou publicação. Essas responsabilidades pertencem aos
-colegas 2, 3 e 4. Os resultados locais estão prontos para o colega 2 registar no
-sistema de tracking da equipa. Os comandos de treino/inferência são uma proposta
-a acordar em conjunto; não são apresentados como decisão já aprovada pelo grupo.
+O pipeline completo está em models/model.joblib. A configuração e os resultados
+por fold permitem auditar a escolha. A publicação no MLflow identifica os
+candidatos, o critério e a versão vencedora; staging/production seguem a pipeline
+de testes existente. Não se compara automaticamente com execuções históricas
+que usem outros dados ou protocolos de validação.
 """
     (ROOT / "docs").mkdir(exist_ok=True)
     (ROOT / "docs/baseline-results.md").write_text(text, encoding="utf-8")

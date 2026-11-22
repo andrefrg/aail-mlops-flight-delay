@@ -1,8 +1,9 @@
-"""Classroom estimator, wrapped in the preprocessing required for flight records."""
+"""Configured classifiers sharing the same train-only flight preprocessing."""
 
 import numpy as np
 from sklearn.compose import ColumnTransformer
 from sklearn.dummy import DummyClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
@@ -21,9 +22,28 @@ def make_pipeline(variant, config):
                 ("classifier", DummyClassifier(strategy="most_frequent")),
             ]
         )
-    C = float(variant["C"])
-    if C not in [0.1, 1.0, 10.0]:
-        raise ValueError("Use the classroom C grid: [0.1, 1.0, 10.0]")
+    estimator = variant.get("estimator", "LogisticRegression")
+    if estimator == "LogisticRegression":
+        C = float(variant["C"])
+        if C not in [0.1, 1.0, 10.0]:
+            raise ValueError("Use the classroom C grid: [0.1, 1.0, 10.0]")
+        if variant.get("class_weight") not in [None, "balanced"]:
+            raise ValueError("Unsupported logistic class_weight")
+        parameters = {"max_iter": 200, "C": C}
+        if variant.get("class_weight") is not None:
+            parameters["class_weight"] = variant["class_weight"]
+        model = LogisticRegression(**parameters)
+    elif estimator == "RandomForestClassifier":
+        model = RandomForestClassifier(
+            n_estimators=variant.get("n_estimators", 60),
+            max_depth=variant.get("max_depth", 16),
+            min_samples_leaf=variant.get("min_samples_leaf", 30),
+            class_weight=variant.get("class_weight", "balanced_subsample"),
+            n_jobs=variant.get("n_jobs", 2),
+            random_state=config.get("seed", 42),
+        )
+    else:
+        raise ValueError(f"Unsupported estimator: {estimator}")
     encoding = ColumnTransformer(
         [
             (
@@ -45,8 +65,6 @@ def make_pipeline(variant, config):
         sparse_threshold=1.0,
         remainder="drop",
     )
-    # Same estimator and explicit parameters as LAIA_PL6/train.py.
-    model = LogisticRegression(max_iter=200, C=C)
     return Pipeline(
         [
             ("features", FlightFeatures()),

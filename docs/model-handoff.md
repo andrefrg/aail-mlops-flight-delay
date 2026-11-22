@@ -3,7 +3,7 @@
 ## Ficheiros
 
 - models/model.joblib — nome base model, serialização joblib; pipeline completo.
-- models/model_metadata.json — inputs, classes, C, max_iter, hash e contexto de treino.
+- models/model_metadata.json — inputs, classes, estimador e candidato escolhido, critério, hash e contexto de treino. C/max_iter só se aplicam à regressão.
 - reports/generated/baseline/cross_validation.csv — parâmetros e métricas de validação.
 - reports/generated/baseline/holdout.json — métricas por classe e matriz de confusão.
 - reports/generated/baseline/holdout_subgroups.csv — resultados por mês, companhia e origem.
@@ -46,8 +46,8 @@ Comandos locais:
 - Treino/preparação/avaliação: python train.py
 - Inferência local: python scripts/predict.py --input CAMINHO_JSON
 
-Os dados preparados e os modelos ficam fora do Git. O baseline é inicial e prevê
-quase sempre on_time; os resultados não demonstram utilidade operacional.
+Os dados preparados e os modelos ficam fora do Git. O vencedor depende da validação. Maior macro-F1 não demonstra por si só utilidade
+operacional; precision/recall e consumo de recursos devem ser revistos.
 
 ## Dockerfile de treino — entrega da parte 1
 
