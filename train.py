@@ -181,7 +181,7 @@ def main():
                     "numpy.dtype",
                     *(
                         ["sklearn.tree._tree.Tree"]
-                        if selection["estimator"] == "RandomForestClassifier"
+                        if selection["estimator"] in ["RandomForestClassifier", "ExtraTreesClassifier"]
                         else []
                     ),
                 ],

@@ -2,7 +2,8 @@
 
 Experiências separadas do baseline da aula. O script não substitui
 models/model.joblib, não consulta o teste final, não publica no MLflow e não
-altera a configuração usada por train.py.
+altera o modelo já exportado. Os candidatos são lidos da mesma configuração
+usada por train.py, evitando duas listas diferentes de modelos.
 
 A partir da raiz, com as dependências de dados/modelo instaladas:
 
@@ -18,10 +19,12 @@ python scripts/migrate_prepared_layout.py, sem recalcular os Parquet.
 
 ## Protocolo
 
-Os candidatos são fixados antes da execução: referência maioritária,
-LogisticRegression(C=0.1, max_iter=200), a mesma regressão com class_weight=balanced
-e RandomForestClassifier com 60 árvores, profundidade máxima 16, mínimo de 30
-exemplos por folha, balanced_subsample, seed=42 e duas tarefas paralelas.
+Os candidatos são fixados antes da execução em configs/baseline.json:
+três regressões logísticas da aula, regressão logística com pesos, duas
+Random Forests (60 árvores/profundidade 16 e 80 árvores/profundidade 24),
+Extra Trees (80 árvores/profundidade 24) e LinearSVC. As florestas usam
+min_samples_leaf=30 e n_jobs=2. O SVM usa C=0.1, pesos balanced e
+max_iter=5000. Junta-se uma referência maioritária que não pode vencer.
 Todos usam os mesmos oito inputs e a preparação do baseline. Imputação, escala,
 encoding e pesos são aprendidos só no treino de cada fold.
 
@@ -47,12 +50,15 @@ treino. provenance.json identifica código, commit, manifesto, fontes, versões 
 protocolo. selection.json é uma classificação de desenvolvimento, sem promoção.
 
 Os resultados pequenos para revisão ficam em reports/tables/model_experiments_*.
-A discussão está em results.md. Uma integração futura do candidato aprovado no
-treino principal deve preservar o contrato da API, ser avaliada quanto a recursos
-na VM e registar as experiências no MLflow. O merge desta contribuição não muda
-o classificador de produção. O teste histórico já foi observado em experiências
+A comparação alargada mais recente está em expanded-results.md;
+a discussão histórica está em results.md. O treino principal já lê estes
+candidatos e regista as experiências no MLflow. Este script é uma comparação
+local de desenvolvimento: não regista nem promove modelos. A integração
+na pipeline continua dependente do merge e dos workflows da equipa. O teste histórico já foi observado em experiências
 anteriores e não deve ser apresentado como nunca visto.
 
 Referências dos estimadores:
 - https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html
 - https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html
+- https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.ExtraTreesClassifier.html
+- https://scikit-learn.org/stable/modules/generated/sklearn.svm.LinearSVC.html

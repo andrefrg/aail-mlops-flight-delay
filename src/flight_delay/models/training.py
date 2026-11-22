@@ -277,7 +277,7 @@ def evaluate_model(config_path):
         "variant": selection["variant"],
         "selection_metric": selection["selection_metric"],
         "C": selection["variant"].get("C"),
-        "max_iter": 200 if selection["estimator"] == "LogisticRegression" else None,
+        "max_iter": joblib.load(MODELS / "model.joblib")[-1].get_params().get("max_iter"),
         "fit": selection["fit"],
         "trained_before_exclusive": selection["train_end_exclusive"],
         "raw_features": BASE_FEATURES,

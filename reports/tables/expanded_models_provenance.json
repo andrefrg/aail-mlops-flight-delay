@@ -1,0 +1,138 @@
+{
+  "created_utc": "2026-11-22T16:49:36.584338+00:00",
+  "git_commit": "5099f31b65b2e5e0be0e3d4a14d2232517b41031",
+  "git_dirty": true,
+  "code_sha256": "a927d58050fd5bf0b89f2fd5f41ab7df9969c7f90ba19b206475c696cc11ef8f",
+  "data_manifest_sha256": "04ec9791801266bc679c15b608806ef11c33b2703210329f8a519ad6ec7c540e",
+  "raw_sources": [
+    {
+      "file": "flights_2022.csv",
+      "bytes": 3034870106,
+      "sha256": "15d1c67edfed9f3d3562a20738d1bbc6a2b86eb18298d4c64171b01ddd178045",
+      "rows": 6729125
+    },
+    {
+      "file": "flights_2023.csv",
+      "bytes": 3095432607,
+      "sha256": "5a74f1609f5a0725093a394728b2b3dbf018a9946ed3dfc62acb3a8f2ce2fe55",
+      "rows": 6847899
+    }
+  ],
+  "versions": {
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "scikit-learn": "1.9.0",
+    "scipy": "1.18.0",
+    "pyarrow": "23.0.1",
+    "joblib": "1.5.3"
+  },
+  "protocol": {
+    "selection_metric": "mean_validation_macro_f1",
+    "sample_per_month": 30000,
+    "validation": "All prepared records in each development validation period",
+    "final_holdout_evaluated": false,
+    "config": {
+      "seed": 42,
+      "years": [
+        2022,
+        2023
+      ],
+      "chunksize": 100000,
+      "sample_per_month": 30000,
+      "gap_days": 7,
+      "features": [
+        "FlightDate",
+        "Reporting_Airline",
+        "Origin",
+        "Dest",
+        "CRSDepTime",
+        "CRSArrTime",
+        "CRSElapsedTime",
+        "Distance"
+      ],
+      "validation_start": "2023-01-01",
+      "holdout_start": "2023-07-01",
+      "end_exclusive": "2024-01-01",
+      "folds": [
+        {
+          "name": "2022_Q4",
+          "validation_start": "2022-10-01",
+          "validation_end": "2023-01-01"
+        },
+        {
+          "name": "2023_Q1",
+          "validation_start": "2023-01-01",
+          "validation_end": "2023-04-01"
+        },
+        {
+          "name": "2023_Q2",
+          "validation_start": "2023-04-01",
+          "validation_end": "2023-07-01"
+        }
+      ],
+      "variants": [
+        {
+          "name": "logistic_C0.1",
+          "C": 0.1,
+          "estimator": "LogisticRegression"
+        },
+        {
+          "name": "logistic_C1.0",
+          "C": 1.0,
+          "estimator": "LogisticRegression"
+        },
+        {
+          "name": "logistic_C10.0",
+          "C": 10.0,
+          "estimator": "LogisticRegression"
+        },
+        {
+          "name": "balanced_logistic",
+          "estimator": "LogisticRegression",
+          "C": 0.1,
+          "class_weight": "balanced"
+        },
+        {
+          "name": "balanced_forest",
+          "estimator": "RandomForestClassifier",
+          "n_estimators": 60,
+          "max_depth": 16,
+          "min_samples_leaf": 30,
+          "class_weight": "balanced_subsample",
+          "n_jobs": 2
+        },
+        {
+          "name": "balanced_forest_deeper",
+          "estimator": "RandomForestClassifier",
+          "n_estimators": 80,
+          "max_depth": 24,
+          "min_samples_leaf": 30,
+          "class_weight": "balanced_subsample",
+          "n_jobs": 2
+        },
+        {
+          "name": "balanced_extra_trees",
+          "estimator": "ExtraTreesClassifier",
+          "n_estimators": 80,
+          "max_depth": 24,
+          "min_samples_leaf": 30,
+          "class_weight": "balanced",
+          "n_jobs": 2
+        },
+        {
+          "name": "balanced_linear_svc",
+          "estimator": "LinearSVC",
+          "C": 0.1,
+          "class_weight": "balanced",
+          "max_iter": 5000
+        }
+      ],
+      "model": {
+        "estimator": "LogisticRegression",
+        "max_iter": 200
+      },
+      "selection_metric": "mean_validation_macro_f1"
+    },
+    "note": "Development comparison only; all candidates use the same training rows. No production promotion."
+  }
+}
