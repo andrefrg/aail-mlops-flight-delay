@@ -41,6 +41,7 @@ jobs:
           uv run --frozen python -m pytest \
             tests/test_data_audit.py \
             tests/test_baseline.py \
+            tests/test_feature_engineering.py \
             tests/test_model_contract.py \
             tests/test_training_workflow.py \
             tests/test_prepared_layout.py \

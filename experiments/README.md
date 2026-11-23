@@ -25,7 +25,10 @@ Random Forests (60 árvores/profundidade 16 e 80 árvores/profundidade 24),
 Extra Trees (80 árvores/profundidade 24) e LinearSVC. As florestas usam
 min_samples_leaf=30 e n_jobs=2. O SVM usa C=0.1, pesos balanced e
 max_iter=5000. Junta-se uma referência maioritária que não pode vencer.
-Todos usam os mesmos oito inputs e a preparação do baseline. Imputação, escala,
+Há também três versões com feature_set=engineered (SVM, floresta mais profunda
+e Extra Trees), mantendo os oito candidatos originais. Todos recebem os mesmos
+oito inputs; os três enriquecidos derivam features adicionais dentro do modelo.
+Definições em docs/feature-engineering.md. Imputação, escala,
 encoding e pesos são aprendidos só no treino de cada fold.
 
 Mantêm-se os três folds expansivos e os sete dias de intervalo de

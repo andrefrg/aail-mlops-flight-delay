@@ -61,6 +61,7 @@ def log_candidate_runs(mlflow, reports, config, selection, execution_type):
             mlflow.log_params(
                 {
                     "candidate": name,
+                    "feature_set": variant.get("feature_set", "baseline"),
                     "estimator": type(classifier).__name__,
                     **{k: v for k, v in classifier.get_params().items() if v is not None},
                 }

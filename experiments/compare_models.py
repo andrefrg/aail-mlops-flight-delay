@@ -128,6 +128,7 @@ def compare(data, output, config, per_month):
                 {
                     "fold": fold["name"],
                     "model": name,
+                    "feature_set": variant.get("feature_set", "baseline"),
                     "train_rows": len(training),
                     "train_end_exclusive": cutoff,
                     "validation_start": fold["validation_start"],
