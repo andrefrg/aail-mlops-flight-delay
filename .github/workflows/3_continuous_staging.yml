@@ -1,136 +1,173 @@
 name: 3 - Continuous Staging
 
 on:
-  workflow_dispatch:
+  workflow_run:
+    workflows: ["2 - Continuous Delivery"]
+    types: [completed]
+    branches: [main]
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
-  integration-pending:
+  check-delivery:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.event == 'workflow_run'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    outputs:
+      promoted: ${{ steps.promotion.outputs.promoted }}
     steps:
-      - name: Indicar que a integração está pendente
+      - name: Confirmar que o CD promoveu para staging
+        id: promotion
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DELIVERY_RUN_ID: ${{ github.event.workflow_run.id }}
+          DELIVERY_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        shell: bash
         run: |
-          echo "::error::Esta etapa está desativada até integrar a API, o modelo, as imagens e os runners."
-          exit 1
+          promotion_job=$(gh api --paginate \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$DELIVERY_RUN_ID/attempts/$DELIVERY_ATTEMPT/jobs" \
+            --jq '.jobs[] | select(.name == "promote-staging" and .conclusion == "success") | .id')
+          if [[ -n "$promotion_job" ]]; then
+            echo "promoted=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "O CD terminou sem promover para staging."
+            echo "promoted=false" >> "$GITHUB_OUTPUT"
+          fi
 
-# Workflow original preservado:
-# # Estrutura do tutorial: testar staging -> promover modelo e imagem para production.
-# name: 3 - Continuous Staging
-# run-name: "${{ github.workflow }}"
-#
-# on:
-#   workflow_run:
-#     workflows: ["2 - Continuous Delivery"]
-#     types: [completed]
-#     branches: [main]
-#
-# permissions:
-#   contents: read
-#   actions: read
-#   packages: write
-#
-# concurrency:
-#   group: flight-delay-promotion
-#   cancel-in-progress: false
-#
-# env:
-#   REGISTRY: ${{ vars.REGISTRY }}
-#   MLFLOW_TRACKING_URI: ${{ vars.MLFLOW_TRACKING_URI }}
-#   MLFLOW_EXPERIMENT_NAME: ${{ vars.MLFLOW_EXPERIMENT_NAME }}
-#   MLFLOW_MODEL_NAME: ${{ vars.MLFLOW_MODEL_NAME }}
-#   MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_USERNAME }}
-#   MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_PASSWORD }}
-#   MODEL_ALIAS: staging
-#   SERVING_CONTAINER: flight-delay-staging-${{ github.run_id }}-${{ github.run_attempt }}
-#   API_BASE_URL: http://127.0.0.1:9001
-#
-# jobs:
-#   stage-tests:
-#     if: >-
-#       github.event.workflow_run.conclusion == 'success' &&
-#       github.event.workflow_run.head_repository.full_name == github.repository &&
-#       github.event.workflow_run.head_branch == 'main' &&
-#       github.event.workflow_run.event == 'workflow_run'
-#     runs-on: [self-hosted, linux, x64, dei-training]
-#     timeout-minutes: 20
-#     steps:
-#       - name: Obter o commit validado na etapa anterior
-#         uses: actions/download-artifact@v4
-#         with:
-#           name: source-commit
-#           path: ${{ runner.temp }}/flight-staging
-#           run-id: ${{ github.event.workflow_run.id }}
-#           github-token: ${{ secrets.GITHUB_TOKEN }}
-#
-#       - name: Preparar commit e endereço das imagens
-#         shell: bash
-#         run: |
-#           COMMIT_SHA=$(cat "$RUNNER_TEMP/flight-staging/source-commit.txt")
-#           [[ "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]]
-#           test "$REGISTRY" = 'ghcr.io'
-#           echo "COMMIT_SHA=$COMMIT_SHA" >> "$GITHUB_ENV"
-#           echo "IMAGE_PREFIX=$REGISTRY/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
-#
-#       - uses: actions/checkout@v4
-#         with:
-#           ref: ${{ env.COMMIT_SHA }}
-#           persist-credentials: false
-#
-#       - uses: actions/setup-python@v5
-#         with:
-#           python-version: '3.10'
-#
-#       - run: python -m pip install uv==0.9.5
-#       - run: uv sync --frozen
-#
-#       - uses: docker/login-action@v3
-#         with:
-#           registry: ${{ env.REGISTRY }}
-#           username: ${{ github.actor }}
-#           password: ${{ secrets.GITHUB_TOKEN }}
-#
-#       - name: Obter e confirmar a imagem de staging
-#         run: |
-#           docker pull "$IMAGE_PREFIX/serving:staging"
-#           image_sha=$(docker image inspect "$IMAGE_PREFIX/serving:staging" \
-#             --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')
-#           test "$image_sha" = "$COMMIT_SHA"
-#
-#       - name: Iniciar API com o modelo staging
-#         run: |
-#           docker run -d --name "$SERVING_CONTAINER" -p 127.0.0.1:9001:8000 \
-#             -e MLFLOW_TRACKING_URI -e MLFLOW_TRACKING_USERNAME -e MLFLOW_TRACKING_PASSWORD \
-#             -e MLFLOW_MODEL_NAME -e MODEL_ALIAS \
-#             "$IMAGE_PREFIX/serving:staging"
-#
-#       - name: Executar testes de staging
-#         run: uv run --frozen python -m pytest tests/test_e2e.py -v
-#
-#       - name: Promover modelo para production
-#         env:
-#           FROM_ALIAS: staging
-#           TO_ALIAS: production
-#         run: uv run --frozen python model_promotion/promote_model.py
-#
-#       - name: Publicar imagem com tag production
-#         run: |
-#           docker tag "$IMAGE_PREFIX/serving:staging" "$IMAGE_PREFIX/serving:production"
-#           docker push "$IMAGE_PREFIX/serving:production"
-#
-#       - name: Mostrar logs em caso de erro
-#         if: failure()
-#         run: docker logs "$SERVING_CONTAINER" || true
-#
-#       - name: Remover container temporário
-#         if: always()
-#         run: docker rm -f "$SERVING_CONTAINER" >/dev/null 2>&1 || true
-#
-#       - name: Passar o commit para deployment
-#         uses: actions/upload-artifact@v4
-#         with:
-#           name: source-commit
-#           path: ${{ runner.temp }}/flight-staging/source-commit.txt
-#           if-no-files-found: error
-#           retention-days: 14
+  stage-tests:
+    needs: check-delivery
+    if: needs.check-delivery.outputs.promoted == 'true'
+    runs-on: [self-hosted, vm03]
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+      packages: write
+    concurrency:
+      group: flight-delay-promotion
+      cancel-in-progress: false
+    env:
+      REGISTRY: ${{ vars.REGISTRY }}
+      MLFLOW_TRACKING_URI: ${{ vars.MLFLOW_TRACKING_URI }}
+      MLFLOW_MODEL_NAME: ${{ vars.MLFLOW_MODEL_NAME }}
+      MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_USERNAME }}
+      MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_PASSWORD }}
+      FROM_ALIAS: staging
+      TO_ALIAS: production
+      SERVING_CONTAINER: flight-delay-staging-${{ github.run_id }}-${{ github.run_attempt }}
+      API_BASE_URL: http://127.0.0.1:9001
+    steps:
+      - name: Preparar o caminho do artefacto
+        run: echo "STAGING_DIR=$RUNNER_TEMP/flight-staging-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+
+      - name: Obter o commit promovido pelo CD
+        uses: actions/download-artifact@v4
+        with:
+          name: source-commit
+          path: ${{ env.STAGING_DIR }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Validar configuração
+        shell: bash
+        run: |
+          commit_sha=$(cat "$STAGING_DIR/source-commit.txt")
+          if [[ ! "$commit_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::O artefacto do CD não contém um SHA válido."
+            exit 1
+          fi
+          if [[ "$REGISTRY" != 'ghcr.io' ]]; then
+            echo "::error::Configura REGISTRY como ghcr.io."
+            exit 1
+          fi
+          : "${MLFLOW_TRACKING_URI:?Configurar MLFLOW_TRACKING_URI}"
+          : "${MLFLOW_MODEL_NAME:?Configurar MLFLOW_MODEL_NAME}"
+          repository=$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
+          echo "COMMIT_SHA=$commit_sha" >> "$GITHUB_ENV"
+          echo "SERVING_REPOSITORY=$REGISTRY/$repository/serving" >> "$GITHUB_ENV"
+
+      - name: Obter o código do commit promovido
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.COMMIT_SHA }}
+          persist-credentials: false
+
+      - name: Autenticar no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Confirmar a imagem de staging
+        shell: bash
+        run: |
+          staging_image="$SERVING_REPOSITORY:staging"
+          docker pull "$staging_image"
+          image_info=$(docker image inspect "$staging_image" \
+            --format '{{.Id}} {{index .Config.Labels "org.opencontainers.image.revision"}}')
+          read -r image_id image_sha <<< "$image_info"
+          if [[ "$image_sha" != "$COMMIT_SHA" ]]; then
+            echo "::error::A imagem staging tem o commit $image_sha. O CD promoveu $COMMIT_SHA."
+            exit 1
+          fi
+          # Usar o mesmo ID nos testes e na promoção, mesmo que a tag mude.
+          echo "SERVING_IMAGE_ID=$image_id" >> "$GITHUB_ENV"
+
+      - name: Confirmar o modelo de staging
+        shell: bash
+        run: |
+          docker run --rm --entrypoint python \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/model_promotion/promote_model.py,dst=/app/promote_model.py,readonly" \
+            -e MLFLOW_TRACKING_URI -e MLFLOW_TRACKING_USERNAME -e MLFLOW_TRACKING_PASSWORD \
+            -e MLFLOW_MODEL_NAME -e FROM_ALIAS -e TO_ALIAS -e COMMIT_SHA \
+            "$SERVING_IMAGE_ID" /app/promote_model.py --check-only
+
+      - name: Iniciar a API com o modelo de staging
+        shell: bash
+        run: |
+          docker run -d --name "$SERVING_CONTAINER" -p 127.0.0.1:9001:8000 \
+            -e MLFLOW_TRACKING_URI -e MLFLOW_TRACKING_USERNAME -e MLFLOW_TRACKING_PASSWORD \
+            -e MLFLOW_MODEL_NAME -e MODEL_ALIAS=staging -e "MODEL_VERSION=$COMMIT_SHA" \
+            "$SERVING_IMAGE_ID"
+
+      - name: Executar testes de staging
+        run: python3 -m unittest discover -s tests -p test_e2e.py -v
+
+      - name: Publicar a imagem testada com a tag production
+        shell: bash
+        run: |
+          production_image="$SERVING_REPOSITORY:production"
+          docker tag "$SERVING_IMAGE_ID" "$production_image"
+          docker push "$production_image"
+
+      - name: Atribuir o alias production ao modelo testado
+        shell: bash
+        run: |
+          docker run --rm --entrypoint python \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/model_promotion/promote_model.py,dst=/app/promote_model.py,readonly" \
+            -e MLFLOW_TRACKING_URI -e MLFLOW_TRACKING_USERNAME -e MLFLOW_TRACKING_PASSWORD \
+            -e MLFLOW_MODEL_NAME -e FROM_ALIAS -e TO_ALIAS -e COMMIT_SHA \
+            "$SERVING_IMAGE_ID" /app/promote_model.py
+
+      - name: Publicar o commit para deployment
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-commit
+          path: ${{ env.STAGING_DIR }}/source-commit.txt
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 14
+
+      - name: Mostrar logs da API se o job falhar
+        if: failure()
+        run: docker logs "$SERVING_CONTAINER" || true
+
+      - name: Remover o container temporário
+        if: always()
+        run: docker rm -f "$SERVING_CONTAINER" || true
