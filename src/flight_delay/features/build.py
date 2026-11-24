@@ -8,19 +8,34 @@ from sklearn.utils.validation import check_is_fitted
 from flight_delay.data.audit import BASE_FEATURES, numeric, valid_hhmm
 
 
+LEADERBOARD_INPUT_NAMES = {
+    "FlightDate": "FL_DATE",
+    "Reporting_Airline": "OP_UNIQUE_CARRIER",
+    "Origin": "ORIGIN",
+    "Dest": "DEST",
+    "CRSDepTime": "CRS_DEP_TIME",
+    "CRSArrTime": "CRS_ARR_TIME",
+    "CRSElapsedTime": "CRS_ELAPSED_TIME",
+    "Distance": "DISTANCE",
+}
+
+
 def canonical_inputs(records):
     frame = records.copy() if isinstance(records, pd.DataFrame) else pd.DataFrame(records)
-    if "FL_DATE" in frame:
-        if "FlightDate" in frame:
-            primary = frame["FlightDate"]
-            alias = frame["FL_DATE"]
-            present = primary.notna() & primary.astype(str).str.strip().ne("")
-            overlap = present & alias.notna() & alias.astype(str).str.strip().ne("")
-            if (primary.loc[overlap].astype(str) != alias.loc[overlap].astype(str)).any():
+    for field, leaderboard_name in LEADERBOARD_INPUT_NAMES.items():
+        if leaderboard_name not in frame:
+            continue
+        alternative = frame[leaderboard_name]
+        if field not in frame:
+            frame[field] = alternative
+            continue
+        primary = frame[field]
+        present = primary.notna() & primary.astype(str).str.strip().ne("")
+        if field == "FlightDate":
+            overlap = present & alternative.notna() & alternative.astype(str).str.strip().ne("")
+            if (primary.loc[overlap].astype(str) != alternative.loc[overlap].astype(str)).any():
                 raise ValueError("Conflicting FlightDate and FL_DATE fields")
-            frame["FlightDate"] = primary.where(present, alias)
-        else:
-            frame["FlightDate"] = frame["FL_DATE"]
+        frame[field] = primary.where(present, alternative)
     missing = sorted(set(BASE_FEATURES) - set(frame.columns))
     if missing:
         raise ValueError(f"Missing required fields: {missing}")

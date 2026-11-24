@@ -3,7 +3,7 @@
 import pandas as pd
 
 from flight_delay.data.audit import BASE_FEATURES
-from flight_delay.features.build import FlightFeatures, serving_frame
+from flight_delay.features.build import LEADERBOARD_INPUT_NAMES, FlightFeatures, serving_frame
 from flight_delay.models.pipeline import CLASSES
 
 
@@ -13,8 +13,10 @@ def prepare_instances(instances):
         if not isinstance(record, dict):
             raise ValueError("Each instance must be a flight record object")
         available = set(record)
-        if "FL_DATE" in available:
-            available.add("FlightDate")
+        available.update(
+            field for field, leaderboard_name in LEADERBOARD_INPUT_NAMES.items()
+            if leaderboard_name in record
+        )
         missing = sorted(set(BASE_FEATURES) - available)
         if missing:
             raise ValueError(f"Instance {index} is missing required fields: {missing}")
