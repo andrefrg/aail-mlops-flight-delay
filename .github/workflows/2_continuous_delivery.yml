@@ -38,7 +38,7 @@ jobs:
         (github.event.workflow_run.head_branch == 'main' &&
          (github.event.workflow_run.event == 'push' ||
           github.event.workflow_run.event == 'workflow_dispatch'))))
-    runs-on: [self-hosted, vm03]
+    runs-on: [self-hosted, vm01]
     timeout-minutes: 180
     outputs:
       image_commit: ${{ steps.config.outputs.image_commit }}

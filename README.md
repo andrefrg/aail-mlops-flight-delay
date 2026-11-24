@@ -71,7 +71,7 @@ O serviço `train` só é iniciado explicitamente com o perfil `training`.
 
 O workflow `2 - Continuous Delivery` arranca automaticamente após um CI
 bem-sucedido na `main` ou numa PR criada a partir de uma branch deste repositório,
-num runner self-hosted com o label `VM2`. O CI publica também as imagens dessas
+num runner self-hosted com o label `vm01`. O CI publica também as imagens dessas
 PRs e passa ao delivery o SHA exato que foi construído. O delivery obtém os
 dados pelo DVC, executa a imagem correspondente e regista o modelo no MLflow.
 PRs de forks não iniciam o treino na VM. O workflow também pode ser iniciado

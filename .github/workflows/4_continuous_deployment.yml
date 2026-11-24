@@ -1,124 +1,164 @@
 name: 4 - Continuous Deployment
 
 on:
-  workflow_dispatch:
+  workflow_run:
+    workflows: ["3 - Continuous Staging"]
+    types: [completed]
+    branches: [main]
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
-  integration-pending:
+  check-staging:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.event == 'workflow_run'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    outputs:
+      promoted: ${{ steps.promotion.outputs.promoted }}
     steps:
-      - name: Indicar que a integração está pendente
+      - name: Confirmar que o CS promoveu para production
+        id: promotion
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STAGING_RUN_ID: ${{ github.event.workflow_run.id }}
+          STAGING_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        shell: bash
         run: |
-          echo "::error::Esta etapa está desativada até integrar a API, o modelo, as imagens e os runners."
-          exit 1
+          staging_job=$(gh api --paginate \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$STAGING_RUN_ID/attempts/$STAGING_ATTEMPT/jobs" \
+            --jq '.jobs[] | select(.name == "stage-tests" and .conclusion == "success") | .id')
+          if [[ -n "$staging_job" ]]; then
+            echo "promoted=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "O CS terminou sem promover para production."
+            echo "promoted=false" >> "$GITHUB_OUTPUT"
+          fi
 
-# Workflow original preservado:
-# # Estrutura do tutorial: obter serving:production e executar o serviço.
-# name: 4 - Continuous Deployment
-# run-name: "${{ github.workflow }}"
-#
-# on:
-#   workflow_run:
-#     workflows: ["3 - Continuous Staging"]
-#     types: [completed]
-#     branches: [main]
-#
-# permissions:
-#   contents: read
-#   actions: read
-#   packages: read
-#
-# concurrency:
-#   group: flight-delay-promotion
-#   cancel-in-progress: false
-#
-# env:
-#   REGISTRY: ${{ vars.REGISTRY }}
-#   MLFLOW_TRACKING_URI: ${{ vars.MLFLOW_TRACKING_URI }}
-#   MLFLOW_MODEL_NAME: ${{ vars.MLFLOW_MODEL_NAME }}
-#   MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_USERNAME }}
-#   MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_PASSWORD }}
-#   MODEL_ALIAS: production
-#   API_BASE_URL: http://127.0.0.1:9000
-#
-# jobs:
-#   deploy-prod:
-#     if: >-
-#       github.event.workflow_run.conclusion == 'success' &&
-#       github.event.workflow_run.head_repository.full_name == github.repository &&
-#       github.event.workflow_run.head_branch == 'main' &&
-#       github.event.workflow_run.event == 'workflow_run'
-#     runs-on: [self-hosted, linux, x64, dei-deployment]
-#     environment: production
-#     timeout-minutes: 20
-#     steps:
-#       - name: Obter o commit aprovado em staging
-#         uses: actions/download-artifact@v4
-#         with:
-#           name: source-commit
-#           path: ${{ runner.temp }}/flight-production
-#           run-id: ${{ github.event.workflow_run.id }}
-#           github-token: ${{ secrets.GITHUB_TOKEN }}
-#
-#       - name: Preparar commit e endereço das imagens
-#         shell: bash
-#         run: |
-#           COMMIT_SHA=$(cat "$RUNNER_TEMP/flight-production/source-commit.txt")
-#           [[ "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]]
-#           test "$REGISTRY" = 'ghcr.io'
-#           echo "COMMIT_SHA=$COMMIT_SHA" >> "$GITHUB_ENV"
-#           echo "IMAGE_PREFIX=$REGISTRY/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
-#
-#       - uses: actions/checkout@v4
-#         with:
-#           ref: ${{ env.COMMIT_SHA }}
-#           persist-credentials: false
-#
-#       - uses: actions/setup-python@v5
-#         with:
-#           python-version: '3.10'
-#
-#       - run: python -m pip install uv==0.9.5
-#       - run: uv sync --frozen
-#
-#       - uses: docker/login-action@v3
-#         with:
-#           registry: ${{ env.REGISTRY }}
-#           username: ${{ github.actor }}
-#           password: ${{ secrets.GITHUB_TOKEN }}
-#
-#       - name: Obter e confirmar a imagem de produção
-#         run: |
-#           docker pull "$IMAGE_PREFIX/serving:production"
-#           image_sha=$(docker image inspect "$IMAGE_PREFIX/serving:production" \
-#             --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')
-#           test "$image_sha" = "$COMMIT_SHA"
-#
-#       - name: Confirmar que o modelo production pertence a este commit
-#         env:
-#           FROM_ALIAS: production
-#           TO_ALIAS: production
-#         run: uv run --frozen python model_promotion/promote_model.py --check-only
-#
-#       - name: Parar e remover o serviço anterior
-#         run: |
-#           docker stop flight-delay-api || true
-#           docker rm flight-delay-api || true
-#
-#       - name: Executar serviço de produção na VM
-#         run: |
-#           docker run -d --name flight-delay-api --restart unless-stopped \
-#             -p 9000:8000 \
-#             -e MLFLOW_TRACKING_URI -e MLFLOW_TRACKING_USERNAME -e MLFLOW_TRACKING_PASSWORD \
-#             -e MLFLOW_MODEL_NAME -e MODEL_ALIAS \
-#             "$IMAGE_PREFIX/serving:production"
-#
-#       - name: Verificar a API publicada
-#         run: uv run --frozen python -m pytest tests/test_e2e.py -v
-#
-#       - name: Mostrar logs em caso de erro
-#         if: failure()
-#         run: docker logs flight-delay-api || true
+  deploy-prod:
+    needs: check-staging
+    if: needs.check-staging.outputs.promoted == 'true'
+    runs-on: [self-hosted, vm03]
+    environment: production
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    concurrency:
+      group: flight-delay-promotion
+      cancel-in-progress: false
+    env:
+      REGISTRY: ${{ vars.REGISTRY }}
+      MLFLOW_TRACKING_URI: ${{ vars.MLFLOW_TRACKING_URI }}
+      MLFLOW_MODEL_NAME: ${{ vars.MLFLOW_MODEL_NAME }}
+      MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_USERNAME }}
+      MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_PASSWORD }}
+      PRODUCTION_CONTAINER: flight-delay-api
+      API_BASE_URL: http://127.0.0.1:9000
+    steps:
+      - name: Preparar o caminho do artefacto
+        run: echo "DEPLOY_DIR=$RUNNER_TEMP/flight-production-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+
+      - name: Obter o commit promovido pelo CS
+        uses: actions/download-artifact@v4
+        with:
+          name: source-commit
+          path: ${{ env.DEPLOY_DIR }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Validar configuração
+        shell: bash
+        run: |
+          commit_sha=$(cat "$DEPLOY_DIR/source-commit.txt")
+          if [[ ! "$commit_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::O artefacto do CS não contém um SHA válido."
+            exit 1
+          fi
+          if [[ "$REGISTRY" != 'ghcr.io' ]]; then
+            echo "::error::Configura REGISTRY como ghcr.io."
+            exit 1
+          fi
+          : "${MLFLOW_TRACKING_URI:?Configurar MLFLOW_TRACKING_URI}"
+          : "${MLFLOW_MODEL_NAME:?Configurar MLFLOW_MODEL_NAME}"
+          repository=$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
+          echo "COMMIT_SHA=$commit_sha" >> "$GITHUB_ENV"
+          echo "PRODUCTION_IMAGE=$REGISTRY/$repository/serving:production" >> "$GITHUB_ENV"
+
+      - name: Obter os testes e o script de verificação do commit promovido
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.COMMIT_SHA }}
+          persist-credentials: false
+
+      - name: Autenticar no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Descarregar e confirmar a imagem de produção
+        shell: bash
+        run: |
+          docker pull "$PRODUCTION_IMAGE"
+          image_info=$(docker image inspect "$PRODUCTION_IMAGE" \
+            --format '{{.Id}} {{index .Config.Labels "org.opencontainers.image.revision"}}')
+          read -r image_id image_sha <<< "$image_info"
+          if [[ "$image_sha" != "$COMMIT_SHA" ]]; then
+            echo "::error::A imagem production tem o commit $image_sha. O CS promoveu $COMMIT_SHA."
+            exit 1
+          fi
+          echo "SERVING_IMAGE_ID=$image_id" >> "$GITHUB_ENV"
+
+      - name: Confirmar o modelo de produção
+        env:
+          FROM_ALIAS: production
+          TO_ALIAS: production
+        shell: bash
+        run: |
+          docker run --rm --entrypoint python \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/model_promotion/promote_model.py,dst=/app/promote_model.py,readonly" \
+            -e MLFLOW_TRACKING_URI -e MLFLOW_TRACKING_USERNAME -e MLFLOW_TRACKING_PASSWORD \
+            -e MLFLOW_MODEL_NAME -e FROM_ALIAS -e TO_ALIAS -e COMMIT_SHA \
+            "$SERVING_IMAGE_ID" /app/promote_model.py --check-only
+
+      - name: Publicar e testar a API de produção
+        id: deploy-api
+        shell: bash
+        run: |
+          previous_id=$(docker container ls --all --format '{{.Names}} {{.ID}}' |
+            awk -v name="$PRODUCTION_CONTAINER" '$1 == name { print $2 }')
+          if [[ -n "$previous_id" ]]; then
+            previous_running=$(docker container inspect --format '{{.State.Running}}' "$previous_id")
+            if [[ "$previous_running" == 'true' ]]; then
+              docker stop "$previous_id"
+            fi
+            docker rm "$previous_id"
+          fi
+
+          docker run -d --name "$PRODUCTION_CONTAINER" -p 9000:8000 \
+            -e MLFLOW_TRACKING_URI -e MLFLOW_TRACKING_USERNAME -e MLFLOW_TRACKING_PASSWORD \
+            -e MLFLOW_MODEL_NAME -e "MODEL_ALIAS=$COMMIT_SHA" -e "MODEL_VERSION=$COMMIT_SHA" \
+            "$SERVING_IMAGE_ID"
+          python3 -m unittest discover -s tests -p test_e2e.py -v
+          python3 - <<'PY'
+          import json
+          import os
+          from urllib.request import urlopen
+
+          with urlopen(f"{os.environ['API_BASE_URL']}/health", timeout=5) as response:
+              version = json.load(response).get("model_version")
+          if version != os.environ["COMMIT_SHA"]:
+              raise SystemExit(f"A API respondeu com uma versão diferente da esperada: {version!r}")
+          PY
+          docker update --restart unless-stopped "$PRODUCTION_CONTAINER"
+
+      - name: Mostrar logs da API se o deploy falhar
+        if: failure() && steps.deploy-api.outcome == 'failure'
+        run: docker logs --tail 100 "$PRODUCTION_CONTAINER" || true
