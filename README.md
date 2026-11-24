@@ -8,8 +8,9 @@ Esta contribuição cobre apenas:
 4. Folds cronológicos e baseline da aula.
 5. Avaliação e entrega do pipeline guardado como model.
 
-O treino compara cinco candidatos nos mesmos três folds temporais: regressão da
-aula com C em [0.1, 1.0, 10.0], regressão com pesos e Random Forest. Seleciona
+O treino compara onze candidatos nos mesmos três folds temporais: regressões
+logísticas, Random Forest, Extra Trees e SVM linear. Três candidatos usam
+features enriquecidas, calculadas no modelo a partir dos mesmos oito inputs. Seleciona
 pelo maior macro-F1 médio de validação e ajusta o vencedor para entrega. O teste
 final não participa na escolha. O pipeline inclui as transformações dos voos.
 
@@ -25,7 +26,9 @@ quando este corresponde ao contexto registado. `train.py --retrain` repete os
 ajustes e substitui resultados locais.
 
 - `configs/feature_policy.csv`: justificação dos 109 campos e oito inputs iniciais.
-- `configs/baseline.json`: preparação, amostra, datas dos folds e C.
+- `configs/baseline.json`: preparação, amostra, folds, candidatos e conjunto de features.
+- `configs/engineered_features.csv`: definição das 18 features adicionais.
+- `docs/feature-engineering.md`: cálculo automático, casos limite e contexto recente experimental.
 - `reports/tables/temporal_splits.csv`: cortes e contagens por fold.
 - `data/processed/monthly/month=YYYY-MM/`: partições mensais; os folds são filtros por data.
 - `experiments/README.md`: comparação isolada de modelos na validação temporal.

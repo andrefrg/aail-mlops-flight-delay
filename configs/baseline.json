@@ -92,6 +92,34 @@
       "C": 0.1,
       "class_weight": "balanced",
       "max_iter": 5000
+    },
+    {
+      "name": "engineered_linear_svc",
+      "estimator": "LinearSVC",
+      "C": 0.1,
+      "class_weight": "balanced",
+      "max_iter": 5000,
+      "feature_set": "engineered"
+    },
+    {
+      "name": "engineered_forest_deeper",
+      "estimator": "RandomForestClassifier",
+      "n_estimators": 80,
+      "max_depth": 24,
+      "min_samples_leaf": 30,
+      "class_weight": "balanced_subsample",
+      "n_jobs": 2,
+      "feature_set": "engineered"
+    },
+    {
+      "name": "engineered_extra_trees",
+      "estimator": "ExtraTreesClassifier",
+      "n_estimators": 80,
+      "max_depth": 24,
+      "min_samples_leaf": 30,
+      "class_weight": "balanced",
+      "n_jobs": 2,
+      "feature_set": "engineered"
     }
   ],
   "model": {

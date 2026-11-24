@@ -1,0 +1,19 @@
+feature,type,feature_set,learned_from,missing_or_unknown,interpretation
+route,categorical,engineered,raw predeparture attributes of this flight,one-hot ignore for unseen categories,origin and destination pair
+airline_origin,categorical,engineered,raw predeparture attributes of this flight,one-hot ignore for unseen categories,reporting airline and origin pair
+origin_departure_hour,categorical,engineered,raw predeparture attributes of this flight,one-hot ignore for unseen categories,origin and scheduled departure hour pair
+departure_time_sin,numeric,engineered,raw predeparture attributes of this flight,train-only median if missing; invalid raw times rejected,cyclic representation; time and calendar from scheduled attributes
+departure_time_cos,numeric,engineered,raw predeparture attributes of this flight,train-only median if missing; invalid raw times rejected,cyclic representation; time and calendar from scheduled attributes
+arrival_time_sin,numeric,engineered,raw predeparture attributes of this flight,train-only median if missing; invalid raw times rejected,cyclic representation; time and calendar from scheduled attributes
+arrival_time_cos,numeric,engineered,raw predeparture attributes of this flight,train-only median if missing; invalid raw times rejected,cyclic representation; time and calendar from scheduled attributes
+weekday_sin,numeric,engineered,raw predeparture attributes of this flight,train-only median if missing; invalid raw times rejected,cyclic representation; time and calendar from scheduled attributes
+weekday_cos,numeric,engineered,raw predeparture attributes of this flight,train-only median if missing; invalid raw times rejected,cyclic representation; time and calendar from scheduled attributes
+year_day_sin,numeric,engineered,raw predeparture attributes of this flight,train-only median if missing; invalid raw times rejected,cyclic representation; time and calendar from scheduled attributes
+year_day_cos,numeric,engineered,raw predeparture attributes of this flight,train-only median if missing; invalid raw times rejected,cyclic representation; time and calendar from scheduled attributes
+is_weekend,numeric,engineered,raw predeparture attributes of this flight,train-only median if missing; invalid raw times rejected,Saturday or Sunday according to FlightDate
+log_distance,numeric,engineered,raw predeparture attributes of this flight,train-only median if missing; invalid raw times rejected,log1p of distance or scheduled elapsed minutes
+log_scheduled_duration,numeric,engineered,raw predeparture attributes of this flight,train-only median if missing; invalid raw times rejected,log1p of distance or scheduled elapsed minutes
+distance_per_scheduled_minute,numeric,engineered,raw predeparture attributes of this flight,train-only median if missing; invalid raw times rejected,distance divided by scheduled elapsed minutes; not actual flight speed
+origin_training_frequency,numeric,engineered,training rows only; no labels,0 for unseen group,relative group frequency in the sampled training fold; not recent operational traffic
+route_training_frequency,numeric,engineered,training rows only; no labels,0 for unseen group,relative group frequency in the sampled training fold; not recent operational traffic
+airline_origin_training_frequency,numeric,engineered,training rows only; no labels,0 for unseen group,relative group frequency in the sampled training fold; not recent operational traffic

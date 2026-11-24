@@ -56,8 +56,10 @@ continuam a precisar de acordo do grupo.
 O baseline da aula mantém-se como referência: LogisticRegression(max_iter=200,
 C=C), com C em [0.1, 1.0, 10.0]. A configuração inclui também regressão com
 class_weight=balanced, duas configurações de RandomForestClassifier,
-ExtraTreesClassifier e LinearSVC com pesos de classes. São oito candidatos,
-além da referência maioritária. As florestas têm limites de tamanho e n_jobs=2.
+ExtraTreesClassifier e LinearSVC com pesos de classes. Três versões adicionais
+usam feature_set=engineered, com derivações automáticas dos mesmos oito inputs.
+São onze candidatos, além da referência maioritária. As florestas têm limites
+de tamanho e n_jobs=2. Ver feature-engineering.md para as novas colunas.
 
 Todos recebem os mesmos inputs e exemplos de treino em cada fold. A escolha usa
 mean_validation_macro_f1, a média aritmética entre os três períodos. Empates

@@ -9,7 +9,10 @@ Comparam-se as três regressões da aula (C=0.1, 1.0, 10.0), regressão com peso
 Random Forest (80 árvores, profundidade 24), Extra Trees (80 árvores,
 profundidade 24, class_weight=balanced) e LinearSVC (C=0.1, balanced,
 max_iter=5000). As duas novas florestas mantêm min_samples_leaf=30 e n_jobs=2.
-Há oito candidatos; as features e os folds não mudam. Uma referência maioritária
+A comparação inclui agora três versões com feature_set=engineered: SVM linear,
+floresta mais profunda e Extra Trees. Há onze candidatos. Os oito inputs brutos
+e os folds não mudam; as versões enriquecidas derivam 18 colunas adicionais
+dentro do modelo. Definições e disponibilidade: feature-engineering.md. Uma referência maioritária
 acompanha a avaliação mas não pode ser escolhida para promoção.
 
 Os candidatos recebem as mesmas linhas e os mesmos oito inputs em cada um dos
@@ -61,7 +64,7 @@ Abrir http://10.17.0.234:8080 e autenticar com a conta da equipa.
 1. Em Experiments, abrir voos-classification.
 2. Abrir a execução selection-train mais recente. O parâmetro selected_variant
    identifica o vencedor e selection_metric documenta o critério.
-3. Expandir as execuções filhas para ver os oito candidatos e a referência.
+3. Expandir as execuções filhas para ver os onze candidatos e a referência.
    Cada candidato tem parâmetros, cv_macro_f1_mean/std, outras métricas médias
    e métricas de validação por fold. O tag selected=true identifica o vencedor.
 4. Selecionar os candidatos dessa mesma execução e usar Compare. Ordenar por

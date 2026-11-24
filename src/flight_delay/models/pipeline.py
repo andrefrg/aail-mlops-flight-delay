@@ -10,12 +10,16 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.svm import LinearSVC
 
-from flight_delay.features.build import FlightFeatures, NUMERIC_COLUMNS, categorical_columns
+from flight_delay.features.build import FlightFeatures, categorical_columns, numeric_columns
 
 CLASSES = ["on_time", "moderate_delay", "severe_delay"]
 
 
 def make_pipeline(variant, config):
+    feature_set = variant.get("feature_set", "baseline")
+    if feature_set not in ["baseline", "engineered"]:
+        raise ValueError(f"Unsupported feature set: {feature_set}")
+    engineered = feature_set == "engineered"
     if variant["name"] == "majority":
         return Pipeline(
             [
@@ -61,7 +65,7 @@ def make_pipeline(variant, config):
             (
                 "categorical",
                 OneHotEncoder(handle_unknown="ignore", sparse_output=True, dtype=np.float64),
-                categorical_columns(),
+                categorical_columns(include_engineered=engineered),
             ),
             (
                 "numeric",
@@ -71,7 +75,7 @@ def make_pipeline(variant, config):
                         ("scale", StandardScaler()),
                     ]
                 ),
-                NUMERIC_COLUMNS,
+                numeric_columns(include_engineered=engineered),
             ),
         ],
         sparse_threshold=1.0,
@@ -79,7 +83,7 @@ def make_pipeline(variant, config):
     )
     return Pipeline(
         [
-            ("features", FlightFeatures()),
+            ("features", FlightFeatures(include_engineered=engineered)),
             ("encode", encoding),
             ("classifier", model),
         ]

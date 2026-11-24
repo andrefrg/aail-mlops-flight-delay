@@ -186,6 +186,7 @@ def train(config_path, retrain=False):
                 {
                     "fold": fold["name"],
                     "model": name,
+                    "feature_set": variant.get("feature_set", "baseline"),
                     "C": variant.get("C"),
                     "train_end_exclusive": train_end,
                     "validation_start": fold["validation_start"],
@@ -220,6 +221,7 @@ def train(config_path, retrain=False):
     selection = {
         "variant": variant,
         "estimator": type(model[-1]).__name__,
+        "feature_set": variant.get("feature_set", "baseline"),
         "selection_metric": selection_metric,
         "selection_scores": scores,
         "fit": fit_info,
@@ -274,6 +276,7 @@ def evaluate_model(config_path):
         "file": "model.joblib",
         "format": "joblib",
         "estimator": selection["estimator"],
+        "feature_set": selection["variant"].get("feature_set", "baseline"),
         "variant": selection["variant"],
         "selection_metric": selection["selection_metric"],
         "C": selection["variant"].get("C"),
