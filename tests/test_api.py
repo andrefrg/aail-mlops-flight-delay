@@ -137,18 +137,31 @@ class ClassifyApiTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 400)
                 self.assertIn("error", response.get_json())
 
-    def test_real_pipeline_accepts_unknown_categories(self):
+    def test_real_pipeline_accepts_leaderboard_names_and_unknown_categories(self):
         training = pd.DataFrame([flight(), flight(Distance=800), flight(Distance=100)])
         model = make_pipeline({"name": "logistic_C1.0", "C": 1.0}, {})
         model.fit(training, ["on_time", "moderate_delay", "severe_delay"])
         client = create_app(model).test_client()
-        alias_record = flight(Origin="UNKNOWN", Reporting_Airline="NEW")
-        alias_record["FL_DATE"] = alias_record.pop("FlightDate")
+        leaderboard_record = {
+            "FL_DATE": "2025-05-15",
+            "OP_UNIQUE_CARRIER": "NEW",
+            "ORIGIN": "UNKNOWN",
+            "DEST": "LAX",
+            "CRS_DEP_TIME": 800,
+            "CRS_ARR_TIME": 1200,
+            "CRS_ELAPSED_TIME": 240,
+            "DISTANCE": 2475,
+        }
         response = self.post(
-            {"instances": [flight(), alias_record]}, client
+            {"request_id": "test-1", "mode": "sandbox", "instances": [flight(), leaderboard_record]},
+            client,
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.get_json()["classifications"]), 2)
+        canonical_response = self.post(
+            {"instances": [flight(), flight(Origin="UNKNOWN", Reporting_Airline="NEW")]}, client
+        )
+        self.assertEqual(canonical_response.status_code, 200)
+        self.assertEqual(response.get_json(), canonical_response.get_json())
 
     def test_rejects_invalid_payloads(self):
         invalid_payloads = [

@@ -1,6 +1,6 @@
 {
   "instances": [
     {"FlightDate": "2025-05-15", "Reporting_Airline": "AA", "Origin": "JFK", "Dest": "LAX", "CRSDepTime": "0900", "CRSArrTime": "1215", "CRSElapsedTime": 375, "Distance": 2475},
-    {"FL_DATE": "2025-05-16", "Reporting_Airline": "NEW_CARRIER", "Origin": "NEW_AIRPORT", "Dest": "LAX", "CRSDepTime": "2400", "CRSArrTime": "0600", "CRSElapsedTime": 180, "Distance": 1000}
+    {"FL_DATE": "2025-05-16", "OP_UNIQUE_CARRIER": "NEW_CARRIER", "ORIGIN": "NEW_AIRPORT", "DEST": "LAX", "CRS_DEP_TIME": 2400, "CRS_ARR_TIME": 600, "CRS_ELAPSED_TIME": 180, "DISTANCE": 1000}
   ]
 }
