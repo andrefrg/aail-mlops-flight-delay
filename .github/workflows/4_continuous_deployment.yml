@@ -143,6 +143,7 @@ jobs:
           fi
 
           docker run -d --name "$PRODUCTION_CONTAINER" -p 9000:8000 \
+            --mount type=volume,src=flight-delay-leaderboard,dst=/app/data \
             -e MLFLOW_TRACKING_URI -e MLFLOW_TRACKING_USERNAME -e MLFLOW_TRACKING_PASSWORD \
             -e MLFLOW_MODEL_NAME -e "MODEL_ALIAS=$COMMIT_SHA" -e "MODEL_VERSION=$COMMIT_SHA" \
             "$SERVING_IMAGE_ID"
