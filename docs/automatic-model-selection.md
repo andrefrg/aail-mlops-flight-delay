@@ -10,10 +10,13 @@ Random Forest (80 árvores, profundidade 24), Extra Trees (80 árvores,
 profundidade 24, class_weight=balanced) e LinearSVC (C=0.1, balanced,
 max_iter=5000). As duas novas florestas mantêm min_samples_leaf=30 e n_jobs=2.
 A comparação inclui agora três versões com feature_set=engineered: SVM linear,
-floresta mais profunda e Extra Trees. Há onze candidatos. Os oito inputs brutos
-e os folds não mudam; as versões enriquecidas derivam 18 colunas adicionais
-dentro do modelo. Definições e disponibilidade: feature-engineering.md. Uma referência maioritária
-acompanha a avaliação mas não pode ser escolhida para promoção.
+floresta mais profunda e Extra Trees. O CatBoost usa as features enriquecidas,
+categorias nativas e pesos por classe. A MLP usa as features de base, one-hot,
+entropia cruzada ponderada e duas camadas densas de 64 e 32 neurónios. Treina
+em PyTorch na CPU e guarda os pesos em arrays NumPy para a inferência.
+Há 13 candidatos. Os oito inputs brutos e os folds mantêm-se. As versões
+enriquecidas derivam as 18 colunas descritas em feature-engineering.md. A
+referência maioritária acompanha a avaliação e fica fora da seleção.
 
 Os candidatos recebem as mesmas linhas e os mesmos oito inputs em cada um dos
 três folds expansivos, com sete dias de intervalo. Transformações e pesos são
@@ -64,16 +67,16 @@ Abrir http://10.17.0.234:8080 e autenticar com a conta da equipa.
 1. Em Experiments, abrir voos-classification.
 2. Abrir a execução selection-train mais recente. O parâmetro selected_variant
    identifica o vencedor e selection_metric documenta o critério.
-3. Expandir as execuções filhas para ver os onze candidatos e a referência.
+3. Expandir as execuções filhas para ver os 13 candidatos e a referência.
    Cada candidato tem parâmetros, cv_macro_f1_mean/std, outras métricas médias
    e métricas de validação por fold. O tag selected=true identifica o vencedor.
 4. Selecionar os candidatos dessa mesma execução e usar Compare. Ordenar por
    cv_macro_f1_mean em ordem decrescente e verificar também precision/recall.
 5. Em Artifacts, consultar validation.json de cada candidato; a execução principal
    guarda configuração, manifesto, seleção, CSV de comparação e relatórios de teste.
-6. Em Models, abrir voos-model para consultar a versão registada do vencedor e
-   a ligação à execução que a produziu. Os candidatos perdedores têm runs de
-   comparação; não são versões finais no Registry.
+6. Em Models, abrir voos-model para consultar a versão registada do vencedor,
+   os tags estimator e selected_variant e a ligação à execução que a produziu.
+   Os restantes candidatos têm runs de comparação no MLflow.
 
 Os tags role=candidate, role=reference e role=selection distinguem os papéis.
 Um filtro útil é tags.role = 'candidate'. Comparar candidatos da mesma execução;

@@ -2,6 +2,7 @@ FROM python:3.10
 WORKDIR /app
 COPY requirements-baseline.txt ./
 RUN pip install --no-cache-dir -r requirements-baseline.txt
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
 COPY src ./src
 COPY scripts ./scripts
 COPY configs ./configs

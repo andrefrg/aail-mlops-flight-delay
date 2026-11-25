@@ -16,7 +16,8 @@ sys.path.insert(0, str(ROOT / "src"))
 from flight_delay.data.prepare import prepare
 from flight_delay.data.audit import sha256
 from flight_delay.models.training import train, evaluate_model
-from flight_delay.models.tracking import log_candidate_runs, tracking_metrics as validation_metrics
+from flight_delay.models.tracking import log_candidate_runs, log_selected_model
+from flight_delay.models.tracking import tracking_metrics as validation_metrics
 
 
 def recorded_evaluation(config_path):
@@ -172,20 +173,8 @@ def main():
             ]:
                 if path.exists():
                     mlflow.log_artifact(str(path), artifact_path="selection")
-            model_info = mlflow.sklearn.log_model(
-                sk_model=joblib.load(ROOT / "models/model.joblib"),
-                name="model",
-                serialization_format="skops",
-                skops_trusted_types=[
-                    "flight_delay.features.build.FlightFeatures",
-                    "numpy.dtype",
-                    *(
-                        ["sklearn.tree._tree.Tree"]
-                        if selection["estimator"] in ["RandomForestClassifier", "ExtraTreesClassifier"]
-                        else []
-                    ),
-                ],
-                code_paths=[str(ROOT / "src/flight_delay")],
+            model_info = log_selected_model(
+                mlflow, joblib.load(ROOT / "models/model.joblib"), ROOT / "src/flight_delay"
             )
             model_name = os.environ.get("MLFLOW_MODEL_NAME", "voos-model")
             version = register_model(
@@ -193,6 +182,7 @@ def main():
             )
             client = mlflow.MlflowClient()
             for key, value in {
+                "estimator": selection["estimator"],
                 "selected_variant": selection["variant"]["name"],
                 "selection_metric": selection["selection_metric"],
                 "data_manifest_sha256": selection["provenance"]["data_manifest_sha256"],
