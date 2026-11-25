@@ -1,6 +1,7 @@
 import logging
 import os
 import pickle
+import sqlite3
 import time
 import uuid
 from pathlib import Path
@@ -9,11 +10,15 @@ import joblib
 import numpy as np
 from flask import Flask, g, jsonify, request
 from werkzeug.exceptions import HTTPException
+from flight_delay.leaderboard import batch_key, store_batch
 from flight_delay.models.inference import prepare_instances
 
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_MODEL_PATH = Path(__file__).resolve().parent / "data" / "model.pkl"
+DEFAULT_LEADERBOARD_DB_PATH = (
+    Path(__file__).resolve().parents[1] / "data" / "leaderboard" / "batches.sqlite3"
+)
 DEFAULT_MAX_BATCH_SIZE = 10000
 
 # Se o modelo devolver inteiros (0/1/2) em vez de texto, este é o mapeamento.
@@ -132,6 +137,9 @@ def create_app(model=None, max_batch_size=None):
         max_batch_size or os.environ.get("MAX_BATCH_SIZE", DEFAULT_MAX_BATCH_SIZE)
     )
     app.config["MODEL_VERSION"] = os.environ.get("MODEL_VERSION", "unknown")
+    app.config["LEADERBOARD_DB_PATH"] = os.environ.get(
+        "LEADERBOARD_DB_PATH", DEFAULT_LEADERBOARD_DB_PATH
+    )
 
     if model is None:
         try:
@@ -218,7 +226,42 @@ def create_app(model=None, max_batch_size=None):
             )
             return jsonify({"error": "Model returned an invalid category."}), 500
 
+        key = batch_key(payload)
+        if key is not None:
+            try:
+                store_batch(
+                    app.config["LEADERBOARD_DB_PATH"],
+                    key,
+                    instances=payload["instances"],
+                    predictions=classifications,
+                )
+            except (OSError, sqlite3.Error):
+                LOGGER.exception("Unable to store leaderboard predictions")
+
         return jsonify({"classifications": classifications})
+
+    @app.post("/labels")
+    def receive_labels():
+        payload = request.get_json(silent=True)
+        key = batch_key(payload)
+        if key is None:
+            return jsonify({"error": "Expected a request_id and mode (sandbox or live)."}), 400
+
+        labels = payload.get("labels")
+        outcomes = payload.get("outcomes")
+        if not isinstance(labels, list) or any(
+            not isinstance(label, str) or label not in VALID_LABELS for label in labels
+        ):
+            return jsonify({"error": "Expected a list of valid flight delay labels."}), 400
+        if (
+            not isinstance(outcomes, list)
+            or len(outcomes) != len(labels)
+            or any(not isinstance(outcome, dict) for outcome in outcomes)
+        ):
+            return jsonify({"error": "Expected one outcome object per label."}), 400
+
+        store_batch(app.config["LEADERBOARD_DB_PATH"], key, labels=labels, outcomes=outcomes)
+        return jsonify({"status": "received"})
 
     return app
 

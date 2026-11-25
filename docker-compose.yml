@@ -10,6 +10,7 @@ services:
       MODEL_VERSION: ${MODEL_VERSION:-unknown}
     volumes:
       - ./models:/app/models:ro
+      - leaderboard-data:/app/data
   train:
     build:
       context: .
@@ -31,3 +32,6 @@ services:
       - ./data:/app/data
       - ./models:/app/models
       - ./reports:/app/reports
+
+volumes:
+  leaderboard-data:

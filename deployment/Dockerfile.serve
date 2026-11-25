@@ -1,7 +1,8 @@
 FROM python:3.10
 WORKDIR /app
 RUN groupadd --system app && useradd --system --gid app --home-dir /app app \
-    && chown app:app /app
+    && chown app:app /app \
+    && install -d -o app -g app /app/data/leaderboard
 COPY requirements-baseline.txt ./
 RUN pip install --no-cache-dir -r requirements-baseline.txt "Flask>=3.0,<4" "gunicorn>=23,<27"
 ARG MODEL_VERSION=unknown

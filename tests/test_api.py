@@ -1,8 +1,11 @@
 import json
 import os
+import sqlite3
 import sys
 import unittest
+from contextlib import closing
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest import mock
 
 import joblib
@@ -141,7 +144,11 @@ class ClassifyApiTests(unittest.TestCase):
         training = pd.DataFrame([flight(), flight(Distance=800), flight(Distance=100)])
         model = make_pipeline({"name": "logistic_C1.0", "C": 1.0}, {})
         model.fit(training, ["on_time", "moderate_delay", "severe_delay"])
-        client = create_app(model).test_client()
+        directory = TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        app = create_app(model)
+        app.config["LEADERBOARD_DB_PATH"] = Path(directory.name) / "batches.sqlite3"
+        client = app.test_client()
         leaderboard_record = {
             "FL_DATE": "2025-05-15",
             "OP_UNIQUE_CARRIER": "NEW",
@@ -230,6 +237,61 @@ class ClassifyApiTests(unittest.TestCase):
     def test_response_has_request_id_header(self):
         response = self.post({"instances": [flight()]})
         self.assertTrue(response.headers.get("X-Request-ID"))
+
+
+class LeaderboardLabelsTests(unittest.TestCase):
+    def setUp(self):
+        directory = TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.database = Path(directory.name) / "leaderboard" / "batches.sqlite3"
+        self.client = self.make_client()
+        self.payload = {
+            "request_id": "batch-1",
+            "mode": "sandbox",
+            "labels": ["on_time", "moderate_delay"],
+            "outcomes": [{"ARR_DELAY": -2, "CARRIER_DELAY": None}, {"ARR_DELAY": 21}],
+        }
+
+    def make_client(self):
+        with mock.patch.dict(os.environ, {"LEADERBOARD_DB_PATH": str(self.database)}):
+            return create_app(FakeModel()).test_client()
+
+    def test_feedback_persists_across_restarts_and_separates_modes(self):
+        instances = [flight(Distance=400), flight(Distance=900)]
+        metadata = {"request_id": "batch-1", "mode": "sandbox"}
+        response = self.client.post("/classify", json={**metadata, "instances": instances})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"classifications": ["on_time", "moderate_delay"]})
+
+        client = self.make_client()
+        for payload in (self.payload, self.payload, {**self.payload, "mode": "live"}):
+            reply = client.post("/labels", json=payload)
+            self.assertEqual(reply.status_code, 200)
+            self.assertEqual(reply.get_json(), {"status": "received"})
+
+        with closing(sqlite3.connect(self.database)) as db:
+            rows = db.execute(
+                "SELECT mode, request_id, instances, predictions, labels, outcomes "
+                "FROM leaderboard_batches ORDER BY mode"
+            ).fetchall()
+        self.assertEqual(len(rows), 2)
+        live, sandbox = rows
+        self.assertEqual(live[:4], ("live", "batch-1", None, None))
+        self.assertEqual(sandbox[:2], ("sandbox", "batch-1"))
+        self.assertEqual(json.loads(sandbox[2]), instances)
+        self.assertEqual(json.loads(sandbox[3]), ["on_time", "moderate_delay"])
+        self.assertEqual(json.loads(sandbox[4]), self.payload["labels"])
+        self.assertEqual(json.loads(sandbox[5]), self.payload["outcomes"])
+
+    def test_rejects_invalid_feedback(self):
+        for changes in (
+            {"request_id": " "}, {"mode": "other"}, {"labels": ["unknown"]},
+            {"outcomes": [{}, "invalid"]}, {"outcomes": []},
+        ):
+            with self.subTest(changes=changes):
+                reply = self.client.post("/labels", json={**self.payload, **changes})
+                self.assertEqual(reply.status_code, 400)
+        self.assertFalse(self.database.exists())
 
 
 class UnknownCategoriesTests(unittest.TestCase):
