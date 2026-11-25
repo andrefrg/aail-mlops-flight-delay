@@ -11,6 +11,8 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.svm import LinearSVC
 
 from flight_delay.features.build import FlightFeatures, categorical_columns, numeric_columns
+from flight_delay.models.catboost import CatBoostClassifier
+from flight_delay.models.mlp import TorchMLPClassifier
 
 CLASSES = ["on_time", "moderate_delay", "severe_delay"]
 
@@ -28,7 +30,29 @@ def make_pipeline(variant, config):
             ]
         )
     estimator = variant.get("estimator", "LogisticRegression")
-    if estimator == "LogisticRegression":
+    features = FlightFeatures(include_engineered=engineered)
+    categories = categorical_columns(include_engineered=engineered)
+    if estimator == "CatBoostClassifier":
+        model = CatBoostClassifier(
+            cat_features=categories,
+            iterations=variant.get("iterations", 250),
+            depth=variant.get("depth", 6),
+            learning_rate=variant.get("learning_rate", 0.1),
+            auto_class_weights=variant.get("auto_class_weights"),
+            thread_count=variant.get("thread_count", 2),
+            random_seed=config.get("seed", 42),
+        )
+        return Pipeline([("features", features), ("classifier", model)])
+    if estimator == "TorchMLPClassifier":
+        model = TorchMLPClassifier(
+            hidden_sizes=tuple(variant.get("hidden_sizes", [64, 32])),
+            epochs=variant.get("epochs", 10),
+            batch_size=variant.get("batch_size", 1024),
+            learning_rate=variant.get("learning_rate", 0.001),
+            class_weight=variant.get("class_weight"),
+            random_state=config.get("seed", 42),
+        )
+    elif estimator == "LogisticRegression":
         C = float(variant["C"])
         if C not in [0.1, 1.0, 10.0]:
             raise ValueError("Use the classroom C grid: [0.1, 1.0, 10.0]")
@@ -65,7 +89,7 @@ def make_pipeline(variant, config):
             (
                 "categorical",
                 OneHotEncoder(handle_unknown="ignore", sparse_output=True, dtype=np.float64),
-                categorical_columns(include_engineered=engineered),
+                categories,
             ),
             (
                 "numeric",
@@ -83,7 +107,7 @@ def make_pipeline(variant, config):
     )
     return Pipeline(
         [
-            ("features", FlightFeatures(include_engineered=engineered)),
+            ("features", features),
             ("encode", encoding),
             ("classifier", model),
         ]

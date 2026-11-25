@@ -34,7 +34,7 @@ def code_fingerprint():
     return digest.hexdigest()
 
 
-def provenance(config_path):
+def provenance(config_path, variants):
     def git(*args):
         try:
             return subprocess.check_output(
@@ -43,6 +43,12 @@ def provenance(config_path):
         except (subprocess.CalledProcessError, OSError):
             return "unavailable"
 
+    packages = ["numpy", "pandas", "scikit-learn", "scipy", "pyarrow", "joblib"]
+    estimators = {variant.get("estimator") for variant in variants}
+    if "CatBoostClassifier" in estimators:
+        packages.append("catboost")
+    if "TorchMLPClassifier" in estimators:
+        packages.append("torch")
     return {
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "git_commit": git("rev-parse", "HEAD"),
@@ -50,10 +56,7 @@ def provenance(config_path):
         "code_sha256": code_fingerprint(),
         "config_sha256": sha256(config_path),
         "data_manifest_sha256": sha256(DATA / "manifest.json"),
-        "versions": {
-            name: version(name)
-            for name in ["numpy", "pandas", "scikit-learn", "scipy", "pyarrow", "joblib"]
-        },
+        "versions": {name: version(name) for name in packages},
     }
 
 
@@ -162,7 +165,7 @@ def train(config_path, retrain=False):
     MODELS.mkdir(exist_ok=True)
     result_rows = []
     validation_details = {}
-    origin = provenance(config_path)
+    origin = provenance(config_path, variants)
     for fold in config["folds"]:
         training, train_end = before(sample, fold["validation_start"], config["gap_days"])
         if training.empty:

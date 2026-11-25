@@ -1,6 +1,7 @@
 """MLflow presentation of candidate validation; selection remains in training.py."""
 
 import json
+from importlib.metadata import version
 from pathlib import Path
 
 import numpy as np
@@ -16,6 +17,27 @@ VALIDATION_METRICS = [
     "severe_recall",
     "severe_precision",
 ]
+
+
+def log_selected_model(mlflow, model, code_path):
+    estimator = type(model[-1]).__name__
+    trusted_types = ["flight_delay.features.build.FlightFeatures", "numpy.dtype"]
+    runtime_packages = ["mlflow", "numpy", "pandas", "scipy", "scikit-learn", "skops"]
+    if estimator in ["RandomForestClassifier", "ExtraTreesClassifier"]:
+        trusted_types.append("sklearn.tree._tree.Tree")
+    elif estimator == "CatBoostClassifier":
+        trusted_types.append("flight_delay.models.catboost.CatBoostClassifier")
+        runtime_packages.append("catboost")
+    elif estimator == "TorchMLPClassifier":
+        trusted_types.append("flight_delay.models.mlp.TorchMLPClassifier")
+    return mlflow.sklearn.log_model(
+        sk_model=model,
+        name="model",
+        serialization_format="skops",
+        skops_trusted_types=trusted_types,
+        pip_requirements=[f"{name}=={version(name)}" for name in runtime_packages],
+        code_paths=[str(code_path)],
+    )
 
 
 def tracking_metrics(reports, selection, result=None):

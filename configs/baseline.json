@@ -120,6 +120,25 @@
       "class_weight": "balanced",
       "n_jobs": 2,
       "feature_set": "engineered"
+    },
+    {
+      "name": "engineered_catboost",
+      "estimator": "CatBoostClassifier",
+      "feature_set": "engineered",
+      "iterations": 250,
+      "depth": 6,
+      "learning_rate": 0.1,
+      "auto_class_weights": "Balanced",
+      "thread_count": 2
+    },
+    {
+      "name": "baseline_torch_mlp",
+      "estimator": "TorchMLPClassifier",
+      "hidden_sizes": [64, 32],
+      "epochs": 10,
+      "batch_size": 1024,
+      "learning_rate": 0.001,
+      "class_weight": "balanced"
     }
   ],
   "model": {

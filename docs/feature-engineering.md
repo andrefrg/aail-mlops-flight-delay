@@ -42,8 +42,10 @@ configs/baseline.json contém os oito candidatos anteriores e três novos pares:
 
 Só muda a representação das features nesses pares. Mantêm-se as mesmas linhas,
 classes, três folds, intervalo de sete dias e seleção por macro-F1 médio.
-A referência maioritária continua excluída da seleção. São 11 candidatos mais
-a referência: 36 ajustes de validação, seguidos do ajuste final habitual.
+A configuração atual também inclui CatBoost com features enriquecidas e uma
+MLP com features de base. Os 13 candidatos e a referência maioritária totalizam
+42 ajustes de validação, seguidos do ajuste final habitual. A referência fica
+fora da seleção.
 São hipóteses de melhoria; ainda não há resultados reais destas novas features.
 O custo aumenta, sobretudo com as interações categóricas; mantêm-se limites de
 profundidade/folhas e n_jobs=2 nas florestas. Não se convertem os inputs para uma

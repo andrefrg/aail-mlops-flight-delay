@@ -6,6 +6,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import joblib
 import numpy as np
@@ -18,6 +19,8 @@ from experiments.compare_models import build_model, compare, development_sample,
 from flight_delay.data.audit import BASE_FEATURES
 from flight_delay.data.prepare import prepare
 from flight_delay.models.pipeline import make_pipeline
+from flight_delay.models.tracking import log_selected_model
+from scripts.app import create_app, load_model
 from test_baseline import fixture
 
 
@@ -122,3 +125,42 @@ class ExperimentTests(unittest.TestCase):
             )
             with self.assertRaises(FileExistsError):
                 compare(data, root / "results", config, 100)
+
+
+def test_catboost_and_mlp_load_from_registry_alias(tmp_path):
+    import mlflow
+    import mlflow.sklearn
+
+    frame = fixture()
+    future = frame[BASE_FEATURES].iloc[:5].copy()
+    future["Origin"] = "UNKNOWN"
+    future["Distance"] = np.nan
+    previous_tracking = mlflow.get_tracking_uri()
+    previous_registry = mlflow.get_registry_uri()
+    uri = f"sqlite:///{(tmp_path / 'mlflow.db').as_posix()}"
+    mlflow.set_tracking_uri(uri)
+    mlflow.set_registry_uri(uri)
+    try:
+        client = mlflow.MlflowClient()
+        artifact_root = (tmp_path / "artifacts").as_uri()
+        experiment_id = client.create_experiment("local-validation", artifact_root)
+        config = json.loads((ROOT / "configs/baseline.json").read_text())
+        variants = {variant["name"]: variant for variant in config["variants"]}
+        for name in ["engineered_catboost", "baseline_torch_mlp"]:
+            candidate = make_pipeline(variants[name], config).fit(frame[BASE_FEATURES], frame.target)
+            with mlflow.start_run(experiment_id=experiment_id):
+                info = log_selected_model(mlflow, candidate, ROOT / "src/flight_delay")
+            registered = mlflow.register_model(info.model_uri, "local-voos-model")
+            client.set_registered_model_alias("local-voos-model", "staging", registered.version)
+            with patch.dict(
+                "os.environ", MLFLOW_MODEL_NAME="local-voos-model", MODEL_ALIAS="staging"
+            ):
+                restored = load_model()
+            response = create_app(model=restored).test_client().post(
+                "/classify", json={"instances": json.loads(future.to_json(orient="records"))}
+            )
+            assert response.status_code == 200
+            assert response.get_json()["classifications"] == candidate.predict(future).tolist()
+    finally:
+        mlflow.set_tracking_uri(previous_tracking)
+        mlflow.set_registry_uri(previous_registry)

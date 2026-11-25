@@ -8,9 +8,10 @@ Esta contribuição cobre apenas:
 4. Folds cronológicos e baseline da aula.
 5. Avaliação e entrega do pipeline guardado como model.
 
-O treino compara onze candidatos nos mesmos três folds temporais: regressões
-logísticas, Random Forest, Extra Trees e SVM linear. Três candidatos usam
-features enriquecidas, calculadas no modelo a partir dos mesmos oito inputs. Seleciona
+O treino compara 13 candidatos nos mesmos três folds temporais: regressões
+logísticas, Random Forest, Extra Trees, SVM linear, CatBoost e uma MLP treinada
+em PyTorch. Quatro candidatos usam features enriquecidas, calculadas
+no modelo a partir dos mesmos oito inputs. Seleciona
 pelo maior macro-F1 médio de validação e ajusta o vencedor para entrega. O teste
 final não participa na escolha. O pipeline inclui as transformações dos voos.
 
